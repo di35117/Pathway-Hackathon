@@ -8,7 +8,21 @@ wheels/
 
 
 # Virtual environments
-.venv
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+
+# Project runtime data & outputs
+demo_data/
+metrics/
+output/
+Cache/
+watched_docs/
 
 # Secrets
 .env

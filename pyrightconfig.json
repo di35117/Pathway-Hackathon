@@ -1,0 +1,10 @@
+{
+    "venvPath": "/Users/adityagupta/.gemini/antigravity/scratch/hackathon",
+    "venv": "venv",
+    "pythonVersion": "3.11",
+    "extraPaths": [
+        "/Users/adityagupta/.gemini/antigravity/scratch/hackathon"
+    ],
+    "reportMissingImports": false,
+    "reportMissingModuleSource": false
+}

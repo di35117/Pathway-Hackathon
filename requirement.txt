@@ -1,0 +1,5 @@
+pathway
+python-dotenv
+paho-mqtt
+sentence-transformers
+litellm
