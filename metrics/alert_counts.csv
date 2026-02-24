@@ -1,0 +1,3 @@
+"alert_type","count","avg_risk","critical_count","time","diff"
+"door_open","1","0.25","0","1771699967608","1"
+"temp_high","1","0.65","0","1771699967608","1"

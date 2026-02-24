@@ -1,0 +1,3 @@
+"shipment_id","alert_timestamp","event_timestamp","latency_ms","latency_category","time","diff"
+"S002","2000.0","1999.3","700.0000000000455","acceptable","1771699967608","1"
+"S001","1000.0","999.5","500.0","acceptable","1771699967608","1"

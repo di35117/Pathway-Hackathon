@@ -1,0 +1,3 @@
+"timestamp","event_timestamp","shipment_id","alert_type","risk_probability","temp_c","threshold_c","cargo_type","cargo_value_inr","temp_delta","is_critical","time","diff"
+"2000.0","1999.3","S002","door_open","0.25","9.0","8.0","vegetables","80000.0","1.0","False","1771699967608","1"
+"1000.0","999.5","S001","temp_high","0.65","12.0","6.0","dairy","250000.0","6.0","False","1771699967608","1"
