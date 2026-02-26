@@ -9,6 +9,10 @@ Usage:
     python main.py mqtt         # Start MQTT pipeline listener (requires MQTT broker)
     python main.py sim-temp     # Start temperature simulator (requires MQTT broker)
     python main.py sim-gps      # Start GPS simulator (requires MQTT broker)
+    python main.py sim-reefer   # Start reefer telemetry simulator
+    python main.py sim-door     # Start door/shock event simulator
+    python main.py sim-all      # Start ALL simulators at once
+    python main.py dashboard    # Start web dashboard (Flask)
 """
 
 import sys
@@ -17,15 +21,14 @@ import sys
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
-        print("Available commands: rag, metrics, full, mqtt, sim-temp, sim-gps")
+        print("Available commands: rag, metrics, full, mqtt, sim-temp, sim-gps, sim-reefer, sim-door, sim-all, dashboard")
         return
 
     command = sys.argv[1].lower()
 
     if command == "rag":
-        from pathway_rag_pipeline import LiveColdRAGPipeline
-        pipeline = LiveColdRAGPipeline()
-        pipeline.run()
+        from pathway_rag_pipeline import run_rag_pipeline
+        run_rag_pipeline()
 
     elif command == "metrics":
         from pathway_metrics_pipeline import PathwayMetricsPipeline, create_demo_alert_stream, create_demo_decision_stream
@@ -69,6 +72,47 @@ def main():
     elif command == "sim-gps":
         from sim.gps_simulator import main as sim_main
         sim_main()
+
+    elif command == "sim-reefer":
+        from sim.reefer_simulator import main as sim_main
+        sim_main()
+
+    elif command == "sim-door":
+        from sim.door_simulator import main as sim_main
+        sim_main()
+
+    elif command == "sim-all":
+        import threading
+        from sim.temp_simulator import main as temp_main
+        from sim.gps_simulator import main as gps_main
+        from sim.reefer_simulator import main as reefer_main
+        from sim.door_simulator import main as door_main
+
+        print("🚀 Starting ALL simulators...")
+        threads = [
+            threading.Thread(target=temp_main, daemon=True, name="TempSim"),
+            threading.Thread(target=gps_main, daemon=True, name="GPSSim"),
+            threading.Thread(target=reefer_main, daemon=True, name="ReeferSim"),
+            threading.Thread(target=door_main, daemon=True, name="DoorSim"),
+        ]
+        for t in threads:
+            t.start()
+            print(f"  ✓ {t.name} started")
+
+        try:
+            while True:
+                import time
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n🛑 All simulators stopped.")
+
+    elif command == "dashboard":
+        from dashboard.app import main as dash_main
+        dash_main()
+
+    elif command == "pathway-bridge":
+        from pathway_mqtt_bridge import build_pathway_pipeline
+        build_pathway_pipeline()
 
     else:
         print(f"Unknown command: {command}")
