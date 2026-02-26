@@ -10,6 +10,10 @@ wheels/
 # Virtual environments
 venv/
 .venv/
+.venv-slim/
+
+# Lock files (auto-generated)
+uv.lock
 
 # macOS
 .DS_Store

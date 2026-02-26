@@ -13,7 +13,8 @@ logging.basicConfig(
 log = logging.getLogger("livecold")
 # ──────────────────────────────────────────────────────────────────────────────
 
-BROKER = "localhost"
+import os
+BROKER = os.getenv("MQTT_HOST", "localhost")
 PORT   = 1883
 
 TEMP_TOPIC = "livecold/temp"

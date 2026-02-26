@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveCold - Cold Chain Monitoring Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0a0e17;
+            color: #e0e6f0;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #0d1526 0%, #162040 100%);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e3050;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4fc3f7, #81d4fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .status {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #8899aa;
+        }
+
+        .header .status .live {
+            color: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* ── Layout ── */
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            grid-template-rows: auto 1fr;
+            height: calc(100vh - 52px);
+            gap: 0;
+        }
+
+        /* ── Metrics Bar ── */
+        .metrics-bar {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 0;
+            background: #0d1526;
+            border-bottom: 1px solid #1e3050;
+        }
+
+        .metric-card {
+            flex: 1;
+            padding: 14px 20px;
+            border-right: 1px solid #1e3050;
+            text-align: center;
+        }
+
+        .metric-card:last-child {
+            border-right: none;
+        }
+
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4fc3f7;
+        }
+
+        .metric-card .value.danger {
+            color: #ff5252;
+        }
+
+        .metric-card .value.success {
+            color: #4caf50;
+        }
+
+        .metric-card .value.warning {
+            color: #ffc107;
+        }
+
+        .metric-card .label {
+            font-size: 11px;
+            color: #6b7d94;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        /* ── Map ── */
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+        }
+
+        /* ── Right Panel ── */
+        .right-panel {
+            background: #0d1526;
+            border-left: 1px solid #1e3050;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            border-bottom: 1px solid #1e3050;
+        }
+
+        .panel-header {
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6b7d94;
+            background: #0a0e17;
+        }
+
+        /* ── Alerts List ── */
+        .alerts-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 50vh;
+        }
+
+        .alert-item {
+            padding: 10px 16px;
+            border-bottom: 1px solid #141c2e;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .alert-item:hover {
+            background: #141c2e;
+        }
+
+        .alert-item.divert {
+            border-left: 3px solid #ff5252;
+        }
+
+        .alert-item.door {
+            border-left: 3px solid #ffc107;
+        }
+
+        .alert-item .alert-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-item .alert-id {
+            font-weight: 600;
+            color: #e0e6f0;
+        }
+
+        .alert-item .alert-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .alert-item .alert-badge.divert {
+            background: #ff5252;
+            color: #fff;
+        }
+
+        .alert-item .alert-badge.door {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .alert-item .alert-detail {
+            font-size: 11px;
+            color: #6b7d94;
+            margin-top: 4px;
+        }
+
+        .alert-item .sop-rec {
+            font-size: 11px;
+            color: #81d4fa;
+            background: rgba(129, 212, 250, 0.1);
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin-top: 8px;
+            border-left: 2px solid #81d4fa;
+            white-space: pre-line;
+            font-style: italic;
+        }
+
+        /* ── Shipment List ── */
+        .shipment-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .shipment-item {
+            padding: 8px 16px;
+            border-bottom: 1px solid #141c2e;
+            font-size: 12px;
+            display: grid;
+            grid-template-columns: 70px 1fr 50px 50px;
+            gap: 8px;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .shipment-item:hover {
+            background: #141c2e;
+        }
+
+        .shipment-item .sid {
+            font-weight: 600;
+            color: #81d4fa;
+        }
+
+        .shipment-item .route {
+            color: #6b7d94;
+            font-size: 11px;
+        }
+
+        .shipment-item .temp {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .shipment-item .temp.safe {
+            color: #4caf50;
+        }
+
+        .shipment-item .temp.warn {
+            color: #ffc107;
+        }
+
+        .shipment-item .temp.danger {
+            color: #ff5252;
+        }
+
+        .shipment-item .risk {
+            text-align: right;
+            font-size: 11px;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0e17;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e3050;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>❄️ LiveCold — Cold Chain Monitor</h1>
+        <div class="status">
+            <span class="live">● LIVE</span>
+            <span id="event-count">Events: 0</span>
+            <span id="clock"></span>
+        </div>
+    </div>
+
+    <div class="main">
+        <!-- Metrics Bar -->
+        <div class="metrics-bar">
+            <div class="metric-card">
+                <div class="value" id="m-shipments">0</div>
+                <div class="label">Active Shipments</div>
+            </div>
+            <div class="metric-card">
+                <div class="value danger" id="m-diversions">0</div>
+                <div class="label">Active Diversions</div>
+            </div>
+            <div class="metric-card">
+                <div class="value warning" id="m-highrisk">0</div>
+                <div class="label">High Risk Events</div>
+            </div>
+            <div class="metric-card">
+                <div class="value success" id="m-value">₹0</div>
+                <div class="label">Value Monitored</div>
+            </div>
+            <div class="metric-card">
+                <div class="value" id="m-events">0</div>
+                <div class="label">Total Events</div>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div id="map"></div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <div class="panel-section">
+                <div class="panel-header">🚨 Live Alerts</div>
+                <div class="alerts-list" id="alerts-list">
+                    <div class="alert-item" style="color:#6b7d94; text-align:center; padding:30px;">
+                        Waiting for alerts...
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section" style="flex:1; display:flex; flex-direction:column;">
+                <div class="panel-header">🚚 Shipments</div>
+                <div class="shipment-list" id="shipment-list">
+                    <div class="shipment-item"
+                        style="color:#6b7d94; grid-template-columns:1fr; text-align:center; padding:30px;">
+                        Waiting for data...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Map Setup ──
+        const map = L.map('map').setView([22.5, 79.0], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB',
+            maxZoom: 18
+        }).addTo(map);
+
+        const markers = {};
+
+        function getMarkerColor(risk, action) {
+            if (action === 'DIVERT') return '#ff5252';
+            if (risk > 0.5) return '#ffc107';
+            return '#4caf50';
+        }
+
+        function createIcon(color) {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    width: 14px; height: 14px;
+                    background: ${color};
+                    border: 2px solid rgba(255,255,255,0.8);
+                    border-radius: 50%;
+                    box-shadow: 0 0 8px ${color}80;
+                "></div>`,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+        }
+
+        function updateMarker(s) {
+            if (!s.lat || !s.lon) return;
+
+            const color = getMarkerColor(s.risk_probability, s.recommended_action);
+            const temp = s.temp != null ? s.temp.toFixed(1) + '°C' : 'N/A';
+            const popup = `
+                <div style="font-family:system-ui; min-width:180px;">
+                    <b style="font-size:14px;">${s.shipment_id}</b><br>
+                    <span style="color:#888;">${s.product_type}</span><br>
+                    <hr style="border-color:#333; margin:4px 0;">
+                    🌡 Temp: <b>${temp}</b> (${s.safe_min_temp}–${s.safe_max_temp}°C)<br>
+                    ⚠️ Risk: <b>${(s.risk_probability * 100).toFixed(0)}%</b><br>
+                    🎯 Action: <b style="color:${color}">${s.recommended_action}</b><br>
+                    📍 ${s.origin} → ${s.destination}<br>
+                    ❄️ Compressor: ${s.compressor_status || 'N/A'}
+                </div>
+            `;
+
+            if (markers[s.shipment_id]) {
+                markers[s.shipment_id].setLatLng([s.lat, s.lon]);
+                markers[s.shipment_id].setIcon(createIcon(color));
+                markers[s.shipment_id].setPopupContent(popup);
+            } else {
+                markers[s.shipment_id] = L.marker([s.lat, s.lon], { icon: createIcon(color) })
+                    .addTo(map)
+                    .bindPopup(popup);
+            }
+        }
+
+        // ── Update Functions ──
+        function formatINR(n) {
+            if (n >= 10000000) return '₹' + (n / 10000000).toFixed(1) + 'Cr';
+            if (n >= 100000) return '₹' + (n / 100000).toFixed(1) + 'L';
+            if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
+            return '₹' + n;
+        }
+
+        function updateMetrics() {
+            fetch('/api/metrics')
+                .then(r => r.json())
+                .then(m => {
+                    document.getElementById('m-shipments').textContent = m.total_shipments || 0;
+                    document.getElementById('m-diversions').textContent = m.active_diversions || 0;
+                    document.getElementById('m-highrisk').textContent = m.high_risk_events || 0;
+                    document.getElementById('m-value').textContent = formatINR(m.total_value_monitored || 0);
+                    document.getElementById('m-events').textContent = m.total_events || 0;
+                    document.getElementById('event-count').textContent = 'Events: ' + (m.total_events || 0);
+                });
+        }
+
+        function updateShipmentList() {
+            fetch('/api/shipments')
+                .then(r => r.json())
+                .then(ships => {
+                    const list = document.getElementById('shipment-list');
+                    if (ships.length === 0) return;
+
+                    // Sort: DIVERT first, then by risk
+                    ships.sort((a, b) => {
+                        if (a.recommended_action === 'DIVERT' && b.recommended_action !== 'DIVERT') return -1;
+                        if (b.recommended_action === 'DIVERT' && a.recommended_action !== 'DIVERT') return 1;
+                        return b.risk_probability - a.risk_probability;
+                    });
+
+                    list.innerHTML = ships.map(s => {
+                        const temp = s.temp != null ? s.temp.toFixed(1) : '--';
+                        let tempClass = 'safe';
+                        if (s.temp != null) {
+                            if (s.temp > s.safe_max_temp || s.temp < s.safe_min_temp) tempClass = 'danger';
+                            else if (s.temp > s.safe_max_temp - 1 || s.temp < s.safe_min_temp + 1) tempClass = 'warn';
+                        }
+                        const risk = (s.risk_probability * 100).toFixed(0);
+                        return `<div class="shipment-item" onclick="map.setView([${s.lat || 22},${s.lon || 79}], 8)">
+                            <div class="sid">${s.shipment_id}</div>
+                            <div class="route">${s.product_type}<br>${s.origin}→${s.destination}</div>
+                            <div class="temp ${tempClass}">${temp}°</div>
+                            <div class="risk" style="color:${risk > 60 ? '#ff5252' : risk > 30 ? '#ffc107' : '#4caf50'}">${risk}%</div>
+                        </div>`;
+                    }).join('');
+
+                    // Update all markers
+                    ships.forEach(updateMarker);
+                });
+        }
+
+        function updateAlerts() {
+            fetch('/api/alerts')
+                .then(r => r.json())
+                .then(alertList => {
+                    const list = document.getElementById('alerts-list');
+                    if (alertList.length === 0) return;
+
+                    // Recent first
+                    alertList.reverse();
+                    list.innerHTML = alertList.slice(0, 30).map(a => {
+                        const isDivert = a.action === 'DIVERT';
+                        const isDoor = a.action && a.action.includes('DOOR');
+                        const cls = isDivert ? 'divert' : (isDoor ? 'door' : '');
+                        const badgeCls = isDivert ? 'divert' : (isDoor ? 'door' : '');
+                        const time = a.timestamp ? a.timestamp.split('T')[1]?.substring(0, 8) : '';
+                        const sop = a.sop_recommendation ? `<div class="sop-rec">📋 SOP: ${a.sop_recommendation}</div>` : '';
+                        return `<div class="alert-item ${cls}">
+                            <div class="alert-top">
+                                <span class="alert-id">${a.shipment_id}</span>
+                                <span class="alert-badge ${badgeCls}">${a.action}</span>
+                            </div>
+                            <div class="alert-detail">
+                                ${a.product_type} · ${a.temp ? a.temp.toFixed(1) + '°C' : ''} · Risk: ${a.risk ? (a.risk * 100).toFixed(0) + '%' : ''} · ${time}
+                            </div>
+                            ${sop}
+                        </div>`;
+                    }).join('');
+                });
+        }
+
+        // ── Clock ──
+        function updateClock() {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+        }
+
+        // ── SSE for real-time ──
+        const evtSource = new EventSource('/api/stream');
+        evtSource.onmessage = function (event) {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'update') {
+                updateMarker(msg.data);
+            }
+        };
+
+        // ── Polling (fallback + full refresh) ──
+        setInterval(updateMetrics, 2000);
+        setInterval(updateShipmentList, 3000);
+        setInterval(updateAlerts, 3000);
+        setInterval(updateClock, 1000);
+
+        // Initial load
+        updateMetrics();
+        updateShipmentList();
+        updateAlerts();
+        updateClock();
+    </script>
+</body>
+
+</html>

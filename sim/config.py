@@ -1,10 +1,13 @@
 # sim/config.py
 
-BROKER = "localhost"
+import os
+BROKER = os.getenv("MQTT_HOST", "localhost")
 PORT = 1883
 
 GPS_TOPIC = "livecold/gps"
 TEMP_TOPIC = "livecold/temp"
+REEFER_TOPIC = "livecold/reefer"
+DOOR_TOPIC = "livecold/door"
 
 SIMULATION_INTERVAL = 2  # seconds between updates
 
