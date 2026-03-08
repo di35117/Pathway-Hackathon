@@ -11,9 +11,9 @@ const LiveColdLogin = () => {
   const navigate = useNavigate();
 
   const roles = [
-    { id: "driver", label: "Driver",  icon: Truck    },
+    { id: "driver", label: "Driver", icon: Truck },
     { id: "client", label: "Company", icon: Building },
-    { id: "admin",  label: "Admin",   icon: Shield   },
+    { id: "admin", label: "Admin", icon: Shield },
   ];
 
   const handleSubmit = async (e) => {
@@ -84,7 +84,10 @@ const LiveColdLogin = () => {
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => { setRole(r.id); setError(""); }}
+                    onClick={() => {
+                      setRole(r.id);
+                      setError("");
+                    }}
                     className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-xs font-semibold rounded-md transition-all ${
                       isActive
                         ? "bg-[#1c2d45] text-[#22d3ee] shadow-sm"
@@ -155,7 +158,9 @@ const LiveColdLogin = () => {
             </form>
 
             <div className="mt-5 pt-4 border-t border-[#1c2d45] text-center">
-              <span className="text-[#3d5470] text-xs font-mono">New here? </span>
+              <span className="text-[#3d5470] text-xs font-mono">
+                New here?{" "}
+              </span>
               <Link
                 to="/register"
                 className="text-[#22d3ee] text-xs font-mono hover:underline"

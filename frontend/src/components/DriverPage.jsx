@@ -1,22 +1,15 @@
 /**
  * DriverPage.jsx
- *
- * Live map uses Leaflet + OpenStreetMap (free, no API key).
- * All dynamic data comes from the backend WebSocket/MQTT bridge.
- * For frontend testing, a mock data layer seeds initial state and
- * simulates position updates when no WS connection is available.
- *
- * Install:  npm install leaflet react-leaflet
- * Add to index.html / main.jsx:
- *   import 'leaflet/dist/leaflet.css';
+ * Real-road routing via OSRM  (no API key)
+ * Live hub positions fetched from backend, shown on map with risk-reduction badge
+ * WebSocket: POSITION_UPDATE | HUB_UPDATE | ALERT | SHIPMENT_UPDATE
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
 
-// Fix Leaflet default icon paths (Vite / webpack issue)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -24,651 +17,620 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// ── Custom SVG marker icons ──────────────────────────────────────────────────
-const makeTruckIcon = (color) =>
-  L.divIcon({
-    className: "",
-    html: `<div style="
-      width:32px;height:32px;border-radius:50% 50% 50% 0;
-      background:${color};border:2px solid #070b14;
-      transform:rotate(-45deg);
-      box-shadow:0 0 12px ${color}90;
-    "></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -36],
-  });
+// ─── palette ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:     "#07101c",
+  card:   "#0e1d2e",
+  rim:    "#162840",
+  cyan:   "#2dd4bf",
+  blue:   "#38bdf8",
+  green:  "#4ade80",
+  amber:  "#fbbf24",
+  rose:   "#f87171",
+  slate:  "#94a3b8",
+  dim:    "#334155",
+  text:   "#e2e8f0",
+  purple: "#a78bfa",
+};
+const RISK = { LOW: C.green, MEDIUM: C.amber, HIGH: C.rose };
 
-const makeHubIcon = (color) =>
-  L.divIcon({
-    className: "",
-    html: `<div style="
-      width:20px;height:20px;border-radius:4px;
-      background:${color}30;border:2px solid ${color};
+// ─── Leaflet icons ─────────────────────────────────────────────────────────────
+const truckIcon = (col) => L.divIcon({
+  className: "",
+  html: `<div style="position:relative;width:32px;height:32px">
+    <div style="position:absolute;inset:0;border-radius:50%;background:${col};opacity:.25;animation:lc-ping 1.8s ease-out infinite"></div>
+    <div style="position:absolute;inset:5px;border-radius:50%;background:${col};border:2.5px solid #07101c;box-shadow:0 0 12px ${col}90"></div>
+  </div>`,
+  iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18],
+});
+
+// Hub marker with risk-reduction badge visible on map
+const hubIcon = (col, rank, riskPct) => L.divIcon({
+  className: "",
+  html: `<div style="position:relative;display:inline-block">
+    <div style="
+      width:30px;height:30px;border-radius:8px;
+      background:${col}20;border:2px solid ${col};
       display:flex;align-items:center;justify-content:center;
-      font-size:11px;
-    ">❄</div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    popupAnchor: [0, -14],
-  });
+      font-size:12px;font-weight:700;color:${col};
+      font-family:monospace;box-shadow:0 0 12px ${col}50;
+    ">${rank}</div>
+    <div style="
+      position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);
+      background:#0e1d2e;border:1px solid ${col}80;border-radius:10px;
+      padding:1px 5px;white-space:nowrap;
+      font-size:9px;font-weight:700;color:${col};font-family:monospace;
+    ">↓${riskPct}%</div>
+  </div>`,
+  iconSize: [30, 44], iconAnchor: [15, 15], popupAnchor: [0, -20],
+});
 
-// ── Theme ────────────────────────────────────────────────────────────────────
-const T = {
-  bg:         "#060C14",
-  surface:    "#0D1825",
-  border:     "#1A2D42",
-  accent:     "#00D4FF",
-  accentDim:  "#0A3A4A",
-  green:      "#00FF88",
-  orange:     "#FF8C00",
-  red:        "#FF3355",
-  text:       "#E8F4FF",
-  muted:      "#5A7A9A",
-  dim:        "#2A4A6A",
+// OSRM
+const OSRM = "https://router.project-osrm.org/route/v1/driving";
+
+// ─── mock ──────────────────────────────────────────────────────────────────────
+const SEED = {
+  shipmentId: "SHP-001", driverId: "DRV-001", driverName: "Rajesh Kumar",
+  vehicleId: "MH 12 AB 1234", cargo: "Vaccines", cargoValue: 1500000,
+  from: "Mumbai", to: "Delhi",
+  lat: 19.076, lng: 72.878,
+  destLat: 28.6139, destLng: 77.209,
+  speed: 58, temp: 5.2, idealTemp: "2–8°C", isIdeal: true,
+  humidity: 71, battery: 84, compressor: "RUNNING",
+  etaHrs: 15.2, progress: 0.08, riskScore: 0.19, riskLevel: "LOW",
+  status: "ON ROUTE", doorEvents: 1,
 };
 
-const RISK_COLOR = { LOW: T.green, MEDIUM: T.orange, HIGH: T.red };
-
-// ── Mock seed data (used in testing when WS is unavailable) ──────────────────
-const MOCK_SHIPMENT = {
-  id:          sessionStorage.getItem("livecold_id") || "DRV-001",
-  driverName:  "Rajesh Kumar",
-  vehicleId:   "HR 26DQ5551",
-  from:        "Delhi",
-  to:          "Mumbai",
-  cargo:       "Vaccines",
-  cargoValue:  1500000,
-  lat:         28.6139,
-  lng:         77.209,
-  speed:       62,
-  temp:        5.2,
-  idealTemp:   "2–8°C",
-  isIdeal:     true,
-  humidity:    74,
-  battery:     88,
-  compressor:  "RUNNING",
-  etaHrs:      14.5,
-  progress:    0.18,
-  riskScore:   0.22,
-  riskLevel:   "LOW",
-  status:      "ON ROUTE",
-  doorEvents:  1,
-  routePath:   [
-    [28.6139, 77.209], [27.18, 77.44], [26.0, 76.6],
-    [24.58, 74.63],    [23.02, 72.57], [21.17, 72.83],
-    [20.0, 73.2],      [19.076, 72.878],
-  ],
-};
-
-const MOCK_HUBS = [
-  { id:"hub_01", name:"Gurgaon Cold Hub",    lat:28.4595, lng:77.0266, phone:"+91-124-456-7890", capacity:82, tempRange:"-25 to 8°C",  type:"Multi-Temp", riskReduction:38, distKm:22, etaMins:28, color:"#00D4FF" },
-  { id:"hub_02", name:"Okhla Cold Storage",  lat:28.5355, lng:77.251,  phone:"+91-11-2456-7890", capacity:65, tempRange:"2 to 8°C",    type:"Pharma",     riskReduction:31, distKm:18, etaMins:24, color:"#8b5cf6" },
-  { id:"hub_03", name:"Azadpur Mandi Hub",   lat:28.7069, lng:77.1763, phone:"+91-11-2765-4321", capacity:90, tempRange:"0 to 10°C",   type:"General",    riskReduction:22, distKm:34, etaMins:42, color:"#00FF88" },
+const SEED_HUBS = [
+  { id:"h1", name:"Bhiwandi Cold Chain",  lat:19.2813, lng:73.0633, phone:"+91-22-2745-6789", capacity:73, tempRange:"-20–6°C",  type:"Multi-Temp", riskReduction:41, distKm:31, etaMins:38, color: C.blue   },
+  { id:"h2", name:"Vashi Logistics Hub",  lat:19.08,   lng:73.01,   phone:"+91-22-2789-0123", capacity:58, tempRange:"2–8°C",    type:"Pharma",     riskReduction:27, distKm:8,  etaMins:12, color: C.purple },
+  { id:"h3", name:"Pune Hadapsar Hub",    lat:18.508,  lng:73.94,   phone:"+91-20-2645-8901", capacity:88, tempRange:"-15–8°C",  type:"Multi-Temp", riskReduction:19, distKm:55, etaMins:62, color: C.cyan   },
 ];
 
-const MOCK_ALERTS = [
-  { id:"a1", time:"14:32", level:"WARNING", msg:"Temperature drift detected: 5.2°C → 6.1°C over 10 min." },
-  { id:"a2", time:"14:18", level:"INFO",    msg:"Door sensor event #1 logged at Mathura bypass." },
+const SEED_ALERTS = [
+  { id:"a1", time:"14:32", level:"WARNING", msg:"Temperature drift — 5.2°C rising toward 6.1°C over last 10 min." },
+  { id:"a2", time:"14:18", level:"INFO",    msg:"Door sensor event #1 recorded near Panvel." },
 ];
 
-// ── Map fly-to helper ────────────────────────────────────────────────────────
+// ─── helpers ───────────────────────────────────────────────────────────────────
 function FlyTo({ lat, lng }) {
   const map = useMap();
+  const prev = useRef(null);
   useEffect(() => {
-    if (lat && lng) map.flyTo([lat, lng], map.getZoom(), { duration: 1.2 });
+    if (!lat || !lng) return;
+    const k = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+    if (k !== prev.current) { map.panTo([lat, lng], { animate: true, duration: 1.4 }); prev.current = k; }
   }, [lat, lng, map]);
   return null;
 }
 
-// ── Risk bar ─────────────────────────────────────────────────────────────────
-function RiskBar({ score }) {
-  const pct = Math.round(score * 100);
-  const color = score < 0.4 ? T.green : score < 0.7 ? T.orange : T.red;
+const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+// ─── tiny components ───────────────────────────────────────────────────────────
+function Pill({ text, color }) {
   return (
-    <div>
-      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-        <span style={{ color:T.muted, fontSize:10, fontFamily:"Space Mono" }}>RISK SCORE</span>
-        <span style={{ color, fontSize:10, fontFamily:"Space Mono", fontWeight:"bold" }}>{pct}%</span>
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: `${color}18`, border: `1px solid ${color}45`,
+      borderRadius: 20, padding: "2px 9px",
+      color, fontSize: 10, fontFamily: "monospace", letterSpacing: 0.5,
+    }}>{text}</span>
+  );
+}
+
+function DataCell({ label, value, color, big }) {
+  return (
+    <div style={{ background: C.bg, borderRadius: 7, padding: "8px 10px" }}>
+      <div style={{ color: C.dim, fontSize: 9, fontFamily: "monospace", marginBottom: 3, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+      <div style={{ color: color || C.text, fontSize: big ? 18 : 12, fontWeight: big ? 700 : 500, fontFamily: "monospace" }}>{value}</div>
+    </div>
+  );
+}
+
+function RiskMeter({ score }) {
+  const pct = Math.round(score * 100);
+  const col = score < 0.35 ? C.green : score < 0.65 ? C.amber : C.rose;
+  return (
+    <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8, border: `1px solid ${C.rim}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ color: C.slate, fontSize: 11, fontFamily: "monospace" }}>Risk score</span>
+        <span style={{ color: col, fontSize: 16, fontWeight: 700, fontFamily: "monospace" }}>{pct}%</span>
       </div>
-      <div style={{ height:6, background:T.border, borderRadius:3, overflow:"hidden" }}>
-        <div style={{ height:"100%", width:`${pct}%`, background:`linear-gradient(90deg,${color}80,${color})`, borderRadius:3, transition:"width 1s ease" }} />
+      <div style={{ height: 5, background: C.rim, borderRadius: 99 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg,${col}60,${col})`, borderRadius: 99, transition: "width 1.2s ease" }} />
       </div>
     </div>
   );
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
-const SectionHead = ({ label, icon }) => (
-  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-    <span style={{ fontSize:14 }}>{icon}</span>
-    <span style={{ color:T.accent, fontFamily:"Space Mono", fontSize:10, letterSpacing:3, fontWeight:"bold" }}>{label}</span>
-  </div>
-);
-
-// ── Card wrapper ──────────────────────────────────────────────────────────────
-const Card = ({ children, style = {} }) => (
-  <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, padding:"14px 16px", ...style }}>
-    {children}
-  </div>
-);
-
-// ── Main DriverPage ───────────────────────────────────────────────────────────
+// ─── main ──────────────────────────────────────────────────────────────────────
 export default function DriverPage() {
-  const navigate       = useNavigate();
-  const wsRef          = useRef(null);
-  const [tab, setTab]  = useState("map");   // "map" | "shipment" | "hubs" | "alerts" | "calls"
+  const navigate = useNavigate();
+  const [ship,        setShip]        = useState(SEED);
+  const [hubs,        setHubs]        = useState(SEED_HUBS);
+  const [alerts,      setAlerts]      = useState(SEED_ALERTS);
+  const [route,       setRoute]       = useState([]);
+  const [crumbs,      setCrumbs]      = useState([[SEED.lat, SEED.lng]]);
+  const [tab,         setTab]         = useState("map");
+  const [drawer,      setDrawer]      = useState(false);
+  const [call,        setCall]        = useState({ on: false, hubId: null, name: "", phone: "", t: 0 });
+  const [callLog,     setCallLog]     = useState([]);
+  const wsRef   = useRef(null);
+  const osrmRef = useRef(null);
+  const callRef = useRef(null);
 
-  const [shipment,  setShipment]  = useState(MOCK_SHIPMENT);
-  const [hubs,      setHubs]      = useState(MOCK_HUBS);
-  const [alerts,    setAlerts]    = useState(MOCK_ALERTS);
-  const [callState, setCallState] = useState({ active:false, hubId:null, elapsed:0 });
-  const [callLog,   setCallLog]   = useState([]);
-  const timerRef = useRef(null);
-
-  // ── WebSocket connection ──────────────────────────────────────────────────
-  useEffect(() => {
-    // TODO: replace URL with real WS endpoint
-    const WS_URL = import.meta.env?.VITE_WS_URL || "ws://localhost:8080/ws/driver";
-    let ws;
+  // OSRM
+  const fetchRoute = useCallback(async (fLat, fLng, tLat, tLng) => {
     try {
-      ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-
-      ws.onopen = () => console.log("[WS] Driver connected");
-
-      ws.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data);
-          /**
-           * Expected message types from backend:
-           *
-           * { type: "POSITION",   lat, lng, speed, temp, humidity, battery, riskScore, riskLevel, status, compressor, doorEvents }
-           * { type: "HUBS",       hubs: [ { id, name, lat, lng, phone, capacity, tempRange, type, riskReduction, distKm, etaMins, color } ] }
-           * { type: "ALERT",      alert: { id, time, level, msg } }
-           * { type: "SHIPMENT",   ...shipment fields }
-           */
-          switch (msg.type) {
-            case "POSITION":
-              setShipment(prev => ({ ...prev, ...msg }));
-              break;
-            case "HUBS":
-              setHubs(msg.hubs);
-              break;
-            case "ALERT":
-              setAlerts(prev => [msg.alert, ...prev].slice(0, 20));
-              break;
-            case "SHIPMENT":
-              setShipment(prev => ({ ...prev, ...msg }));
-              break;
-            default:
-              break;
-          }
-        } catch {}
-      };
-
-      ws.onerror = () => console.warn("[WS] Driver WS error — using mock data");
-      ws.onclose = () => console.log("[WS] Driver WS closed");
-    } catch {
-      console.warn("[WS] Could not open WebSocket — using mock data");
-    }
-
-    return () => { ws?.close(); };
+      const r = await fetch(`${OSRM}/${fLng},${fLat};${tLng},${tLat}?overview=full&geometries=geojson`);
+      const d = await r.json();
+      if (d.code === "Ok") setRoute(d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]));
+    } catch { /* keep existing */ }
   }, []);
 
-  // ── Call timer ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (callState.active) {
-      timerRef.current = setInterval(() => {
-        setCallState(prev => ({ ...prev, elapsed: prev.elapsed + 1 }));
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [callState.active]);
+    clearTimeout(osrmRef.current);
+    osrmRef.current = setTimeout(() => {
+      if (ship.lat && ship.destLat) fetchRoute(ship.lat, ship.lng, ship.destLat, ship.destLng);
+    }, 2500);
+    return () => clearTimeout(osrmRef.current);
+  }, [ship.lat, ship.lng, fetchRoute]);
 
-  const startCall = (hub) => {
-    setCallState({ active:true, hubId:hub.id, hubName:hub.name, phone:hub.phone, elapsed:0 });
-    setTab("calls");
+  // Hubs from backend
+  const loadHubs = useCallback(async (lat, lng) => {
+    try {
+      const tok = sessionStorage.getItem("livecold_token");
+      const r = await fetch(`/api/driver/hubs/nearest?lat=${lat}&lng=${lng}&limit=3`, { headers: { Authorization: `Bearer ${tok}` } });
+      if (r.ok) { const d = await r.json(); setHubs(d.hubs); }
+    } catch { setHubs(SEED_HUBS); }
+  }, []);
+
+  // Initial REST
+  useEffect(() => {
+    const tok = sessionStorage.getItem("livecold_token");
+    const id  = sessionStorage.getItem("livecold_id");
+    fetch(`/api/driver/shipment/${id}`, { headers: { Authorization: `Bearer ${tok}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setShip(d); loadHubs(d.lat, d.lng); } })
+      .catch(() => loadHubs(SEED.lat, SEED.lng));
+  }, [loadHubs]);
+
+  // WebSocket
+  useEffect(() => {
+    const id  = sessionStorage.getItem("livecold_id");
+    const url = (import.meta.env?.VITE_WS_URL || "ws://localhost:8080") + `/ws/driver/${id}`;
+    let ws;
+    try {
+      ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onmessage = ({ data }) => {
+        try {
+          const m = JSON.parse(data);
+          if (m.type === "POSITION_UPDATE") {
+            setShip(p => ({ ...p, ...m }));
+            setCrumbs(p => [...p.slice(-300), [m.lat, m.lng]]);
+            loadHubs(m.lat, m.lng);
+          } else if (m.type === "HUB_UPDATE")      setHubs(m.hubs);
+          else if (m.type === "ALERT")             setAlerts(p => [m.alert, ...p].slice(0, 40));
+          else if (m.type === "SHIPMENT_UPDATE")   setShip(p => ({ ...p, ...m }));
+        } catch {}
+      };
+    } catch {}
+    return () => ws?.close();
+  }, [loadHubs]);
+
+  // Call timer
+  useEffect(() => {
+    if (call.on) { callRef.current = setInterval(() => setCall(p => ({ ...p, t: p.t + 1 })), 1000); }
+    else          clearInterval(callRef.current);
+    return ()  => clearInterval(callRef.current);
+  }, [call.on]);
+
+  const startCall = (hub) => { setCall({ on: true, hubId: hub.id, name: hub.name, phone: hub.phone, t: 0 }); openTab("calls"); };
+  const endCall   = () => {
+    setCallLog(p => [{ id: Date.now(), name: call.name, phone: call.phone, dur: call.t, at: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) }, ...p]);
+    setCall({ on: false, hubId: null, name: "", phone: "", t: 0 });
   };
 
-  const endCall = () => {
-    const hub = hubs.find(h => h.id === callState.hubId);
-    setCallLog(prev => [{
-      id:    Date.now(),
-      name:  callState.hubName,
-      phone: callState.phone,
-      dur:   callState.elapsed,
-      time:  new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" }),
-    }, ...prev]);
-    setCallState({ active:false, hubId:null, elapsed:0 });
-  };
+  const rc = RISK[ship.riskLevel] || C.green;
+  const openTab = (t) => { setTab(t); setDrawer(t !== "map"); };
+  const logout  = () => { sessionStorage.clear(); navigate("/"); };
 
-  const fmtDur = (s) => `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const unreadAlerts = alerts.filter(a => a.level !== "INFO").length;
 
-  const logout = () => {
-    sessionStorage.clear();
-    navigate("/");
-  };
+  const TABS = [
+    { id: "map",      emoji: "◉",  label: "Map"      },
+    { id: "shipment", emoji: "⬡",  label: "Cargo"    },
+    { id: "hubs",     emoji: "❄",  label: "Hubs"     },
+    { id: "alerts",   emoji: "⚡",  label: "Alerts",  badge: unreadAlerts },
+    { id: "calls",    emoji: "↗",  label: "Calls"    },
+  ];
 
-  // ── Derived ──────────────────────────────────────────────────────────────
-  const riskColor  = RISK_COLOR[shipment.riskLevel] || T.green;
-  const topHub     = hubs[0];
+  // ── Panel content per tab ───────────────────────────────────────────────────
+  const PanelContent = () => (
+    <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
 
-  // ── Truck + hub icons ────────────────────────────────────────────────────
-  const truckIcon = makeTruckIcon(riskColor);
+      {/* MAP tab */}
+      {tab === "map" && <>
+        <div style={{ background: C.card, border: `1px solid ${C.rim}`, borderRadius: 10, padding: "14px 15px" }}>
+          <div style={{ color: C.slate, fontSize: 10, fontFamily: "monospace", marginBottom: 10, letterSpacing: 1 }}>POSITION</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+            <DataCell label="Speed"  value={`${ship.speed} km/h`} />
+            <DataCell label="Status" value={ship.status} color={ship.status === "DIVERTING" ? C.amber : ship.status === "STOPPED" ? C.slate : C.green} />
+            <DataCell label="Lat"    value={ship.lat?.toFixed(4)} />
+            <DataCell label="Lng"    value={ship.lng?.toFixed(4)} />
+          </div>
+        </div>
+        {hubs[0] && (
+          <div style={{ background: C.card, borderLeft: `3px solid ${hubs[0].color}`, border: `1px solid ${C.rim}`, borderRadius: 10, padding: "14px 15px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: C.slate, fontFamily: "monospace", marginBottom: 3 }}>CLOSEST HUB</div>
+                <div style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>{hubs[0].name}</div>
+                <div style={{ color: C.slate, fontSize: 11, marginTop: 2 }}>{hubs[0].distKm} km · {hubs[0].etaMins} min away</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: C.green, fontSize: 20, fontWeight: 700, fontFamily: "monospace" }}>↓{hubs[0].riskReduction}%</div>
+                <div style={{ color: C.slate, fontSize: 9 }}>risk if diverted</div>
+              </div>
+            </div>
+            <button onClick={() => startCall(hubs[0])} style={{ width: "100%", background: `${hubs[0].color}15`, border: `1px solid ${hubs[0].color}50`, borderRadius: 7, color: hubs[0].color, fontSize: 11, fontFamily: "monospace", padding: "8px 0", cursor: "pointer" }}>
+              Call hub →
+            </button>
+          </div>
+        )}
+        <RiskMeter score={ship.riskScore} />
+      </>}
+
+      {/* SHIPMENT tab */}
+      {tab === "shipment" && <>
+        <div style={{ background: `linear-gradient(135deg,${C.blue}12,transparent)`, border: `1px solid ${C.blue}30`, borderRadius: 12, padding: "16px 17px" }}>
+          <div style={{ fontSize: 11, color: C.slate, fontFamily: "monospace", marginBottom: 4 }}>Active shipment</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontFamily: "monospace" }}>{ship.shipmentId}</div>
+          <div style={{ color: C.slate, fontSize: 12, marginTop: 3 }}>
+            <span style={{ color: C.text }}>{ship.from}</span>
+            <span style={{ color: C.dim, margin: "0 8px" }}>→</span>
+            <span style={{ color: C.text }}>{ship.to}</span>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+              <span style={{ fontSize: 10, color: C.slate }}>Progress</span>
+              <span style={{ fontSize: 10, color: C.blue, fontFamily: "monospace" }}>{Math.round(ship.progress * 100)}%</span>
+            </div>
+            <div style={{ height: 4, background: C.rim, borderRadius: 99 }}>
+              <div style={{ height: "100%", width: `${Math.round(ship.progress * 100)}%`, background: `linear-gradient(90deg,${C.blue},${C.cyan})`, borderRadius: 99 }} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.rim}`, borderRadius: 10, padding: "14px 15px" }}>
+          <div style={{ color: C.slate, fontSize: 10, fontFamily: "monospace", marginBottom: 10, letterSpacing: 1 }}>LIVE SENSORS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+            <DataCell label="Temperature" value={`${ship.temp}°C`}       color={ship.isIdeal ? C.green : C.rose} big />
+            <DataCell label="Safe range"  value={ship.idealTemp}          color={C.slate} />
+            <DataCell label="Humidity"    value={`${ship.humidity}%`}     color={C.cyan} />
+            <DataCell label="Battery"     value={`${ship.battery}%`}      color={ship.battery > 50 ? C.green : C.amber} />
+            <DataCell label="Compressor"  value={ship.compressor}         color={ship.compressor === "RUNNING" ? C.green : C.rose} />
+            <DataCell label="Door events" value={ship.doorEvents}         color={ship.doorEvents > 3 ? C.amber : C.slate} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1, background: C.card, border: `1px solid ${C.rim}`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ color: C.slate, fontSize: 10, fontFamily: "monospace" }}>Cargo value</div>
+            <div style={{ color: C.green, fontSize: 22, fontWeight: 700, fontFamily: "monospace", marginTop: 4 }}>
+              ₹{(ship.cargoValue / 100000).toFixed(1)}L
+            </div>
+          </div>
+          <div style={{ flex: 1, background: C.card, border: `1px solid ${C.rim}`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ color: C.slate, fontSize: 10, fontFamily: "monospace" }}>ETA</div>
+            <div style={{ color: C.text, fontSize: 22, fontWeight: 700, fontFamily: "monospace", marginTop: 4 }}>
+              {ship.etaHrs}h
+            </div>
+          </div>
+        </div>
+        <RiskMeter score={ship.riskScore} />
+      </>}
+
+      {/* HUBS tab */}
+      {tab === "hubs" && <>
+        <div style={{ fontSize: 11, color: C.slate, marginBottom: 2 }}>
+          Nearest cold storages — ranked by how much they'd reduce your risk.
+          Data updates as you move.
+        </div>
+        {hubs.slice(0, 3).map((hub, i) => (
+          <div key={hub.id} style={{ background: C.card, border: `1px solid ${C.rim}`, borderLeft: `3px solid ${hub.color}`, borderRadius: 10, padding: "14px 15px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ background: `${hub.color}20`, color: hub.color, fontSize: 9, padding: "1px 7px", borderRadius: 10, fontFamily: "monospace", fontWeight: 700 }}>#{i + 1}</span>
+                  <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{hub.name}</span>
+                </div>
+                <div style={{ color: C.slate, fontSize: 11 }}>{hub.type} · {hub.tempRange}</div>
+              </div>
+              <div style={{ textAlign: "right", marginLeft: 8 }}>
+                <div style={{ color: C.green, fontSize: 22, fontWeight: 700, fontFamily: "monospace", lineHeight: 1 }}>↓{hub.riskReduction}%</div>
+                <div style={{ color: C.slate, fontSize: 9, marginTop: 2 }}>risk drop</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 10 }}>
+              <DataCell label="Distance" value={`${hub.distKm} km`} />
+              <DataCell label="ETA"      value={`${hub.etaMins}m`}  />
+              <DataCell label="Capacity" value={`${hub.capacity}%`} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => startCall(hub)} style={{ flex: 1, background: `${hub.color}15`, border: `1px solid ${hub.color}50`, borderRadius: 7, color: hub.color, fontSize: 11, fontFamily: "monospace", padding: 9, cursor: "pointer" }}>
+                Call
+              </button>
+              <button style={{ flex: 1, background: "transparent", border: `1px solid ${C.rim}`, borderRadius: 7, color: C.slate, fontSize: 11, padding: 9, cursor: "pointer" }}>
+                Navigate
+              </button>
+            </div>
+          </div>
+        ))}
+        {hubs.length === 0 && <div style={{ color: C.slate, textAlign: "center", padding: 40, fontSize: 13 }}>Locating nearby cold storage…</div>}
+      </>}
+
+      {/* ALERTS tab */}
+      {tab === "alerts" && <>
+        <div style={{ fontSize: 11, color: C.slate, marginBottom: 2 }}>Real-time feed</div>
+        {alerts.length === 0 && <div style={{ textAlign: "center", color: C.slate, padding: 40 }}>All clear — no alerts</div>}
+        {alerts.map(a => {
+          const col = a.level === "DANGER" ? C.rose : a.level === "WARNING" ? C.amber : C.cyan;
+          return (
+            <div key={a.id} style={{ background: C.card, borderLeft: `3px solid ${col}`, border: `1px solid ${col}25`, borderRadius: 9, padding: "11px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <span style={{ color: col, fontSize: 9, fontFamily: "monospace", fontWeight: 700, letterSpacing: 1 }}>{a.level}</span>
+                <span style={{ color: C.dim, fontSize: 10 }}>{a.time}</span>
+              </div>
+              <div style={{ color: C.text, fontSize: 12, lineHeight: 1.7 }}>{a.msg}</div>
+            </div>
+          );
+        })}
+      </>}
+
+      {/* CALLS tab */}
+      {tab === "calls" && <>
+        {call.on && (
+          <div style={{ background: `${C.green}12`, border: `1px solid ${C.green}40`, borderRadius: 11, padding: "18px 16px", textAlign: "center" }}>
+            <div style={{ color: C.green, fontSize: 9, fontFamily: "monospace", letterSpacing: 2, marginBottom: 8 }}>● LIVE CALL</div>
+            <div style={{ color: C.text, fontSize: 16, fontWeight: 600, marginBottom: 3 }}>{call.name}</div>
+            <div style={{ color: C.slate, fontSize: 11, marginBottom: 14 }}>{call.phone}</div>
+            <div style={{ color: C.green, fontSize: 32, fontFamily: "monospace", fontWeight: 700, marginBottom: 16 }}>{fmt(call.t)}</div>
+            <button onClick={endCall} style={{ background: `${C.rose}20`, border: `1px solid ${C.rose}`, borderRadius: 8, color: C.rose, padding: "10px 32px", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}>
+              End call
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: C.slate }}>Hub contacts</div>
+        {hubs.slice(0, 3).map((hub, i) => (
+          <div key={hub.id} style={{ background: C.card, border: `1px solid ${C.rim}`, borderRadius: 9, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ display: "flex", gap: 7, alignItems: "center", marginBottom: 3 }}>
+                <span style={{ color: hub.color, fontSize: 9, fontFamily: "monospace" }}>#{i + 1}</span>
+                <span style={{ color: C.text, fontSize: 12, fontWeight: 600 }}>{hub.name}</span>
+              </div>
+              <div style={{ color: C.slate, fontSize: 10 }}>{hub.phone}</div>
+              <div style={{ color: C.green, fontSize: 10, marginTop: 3, fontFamily: "monospace" }}>↓{hub.riskReduction}% · {hub.distKm} km</div>
+            </div>
+            <button onClick={() => startCall(hub)} disabled={call.on} style={{ background: call.on ? C.dim + "30" : `${hub.color}15`, border: `1px solid ${call.on ? C.dim : hub.color}50`, borderRadius: 7, color: call.on ? C.dim : hub.color, fontSize: 10, padding: "9px 14px", cursor: call.on ? "not-allowed" : "pointer" }}>
+              Call
+            </button>
+          </div>
+        ))}
+        {callLog.length > 0 && <>
+          <div style={{ fontSize: 11, color: C.slate, marginTop: 6 }}>Recent</div>
+          {callLog.map(c => (
+            <div key={c.id} style={{ background: C.card, border: `1px solid ${C.rim}`, borderRadius: 8, padding: "10px 13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ color: C.text, fontSize: 12, fontWeight: 500 }}>{c.name}</div>
+                <div style={{ color: C.slate, fontSize: 10, marginTop: 2 }}>{c.phone}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: C.slate, fontSize: 10 }}>{c.at}</div>
+                <div style={{ color: C.cyan, fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{fmt(c.dur)}</div>
+              </div>
+            </div>
+          ))}
+        </>}
+      </>}
+    </div>
+  );
 
   return (
-    <div style={{ width:"100vw", height:"100vh", background:T.bg, display:"flex", flexDirection:"column", fontFamily:"'Space Mono',monospace", overflow:"hidden" }}>
-      {/* ── Top bar ── */}
-      <div style={{ height:48, background:T.surface, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 16px", gap:12, flexShrink:0, zIndex:20 }}>
-        <span style={{ fontSize:16 }}>❄️</span>
-        <span style={{ color:T.accent, fontSize:13, fontWeight:"bold", letterSpacing:2 }}>LIVECOLD</span>
-        <span style={{ color:T.dim, fontSize:9 }}>DRIVER</span>
+    <div style={{ width: "100vw", height: "100svh", background: C.bg, display: "flex", flexDirection: "column", fontFamily: "'Outfit', sans-serif", overflow: "hidden" }}>
 
-        <div style={{ flex:1 }} />
-
-        {/* Live risk pill */}
-        <div style={{ background:riskColor+"20", border:`1px solid ${riskColor}50`, borderRadius:20, padding:"3px 12px", display:"flex", alignItems:"center", gap:6 }}>
-          <div style={{ width:6, height:6, borderRadius:"50%", background:riskColor, animation:"pulse 1.5s infinite" }} />
-          <span style={{ color:riskColor, fontSize:9, letterSpacing:2 }}>
-            {shipment.riskLevel} RISK · {Math.round(shipment.riskScore * 100)}%
-          </span>
+      {/* Top bar */}
+      <div style={{ height: 50, background: C.card, borderBottom: `1px solid ${C.rim}`, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, flexShrink: 0, zIndex: 30 }}>
+        <span style={{ color: C.cyan, fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>❄ LiveCold</span>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: rc, boxShadow: `0 0 6px ${rc}` }} />
+          <span style={{ color: rc, fontSize: 11, fontFamily: "monospace" }}>{ship.riskLevel}</span>
         </div>
-
-        {/* Temp */}
-        <div style={{ background:T.surface, border:`1px solid ${shipment.isIdeal ? T.green+"40" : T.red+"40"}`, borderRadius:6, padding:"3px 10px" }}>
-          <span style={{ color:shipment.isIdeal ? T.green : T.red, fontSize:11, fontWeight:"bold" }}>{shipment.temp}°C</span>
+        <div style={{ background: `${ship.isIdeal ? C.green : C.rose}18`, border: `1px solid ${ship.isIdeal ? C.green : C.rose}40`, borderRadius: 6, padding: "3px 10px" }}>
+          <span style={{ color: ship.isIdeal ? C.green : C.rose, fontSize: 13, fontWeight: 700, fontFamily: "monospace" }}>{ship.temp}°C</span>
         </div>
-
-        <button onClick={logout} style={{ background:"transparent", border:`1px solid ${T.border}`, borderRadius:6, color:T.muted, fontSize:9, padding:"4px 10px", cursor:"pointer" }}>
-          SIGN OUT
+        <button onClick={logout} style={{ background: "none", border: `1px solid ${C.rim}`, borderRadius: 6, color: C.slate, fontSize: 10, padding: "4px 10px", cursor: "pointer" }}>
+          Sign out
         </button>
       </div>
 
-      {/* ── Body ── */}
-      <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+      {/* Body — desktop: side-by-side | mobile: map + bottom sheet */}
+      <div className="dp-body" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
 
-        {/* ── Left: nav + panels ── */}
-        <div style={{ width:340, flexShrink:0, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        {/* ── DESKTOP PANEL (left) ── */}
+        <div className="dp-desk-panel">
           {/* Nav tabs */}
-          <div style={{ display:"flex", borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
-            {[
-              { id:"map",      icon:"🗺", label:"Map"      },
-              { id:"shipment", icon:"📦", label:"Shipment" },
-              { id:"hubs",     icon:"🏭", label:"Hubs"     },
-              { id:"alerts",   icon:"⚡", label:"Alerts"   },
-              { id:"calls",    icon:"📞", label:"Calls"    },
-            ].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                style={{ flex:1, padding:"10px 4px", background:tab===t.id ? T.accentDim : "transparent",
-                  borderBottom:tab===t.id ? `2px solid ${T.accent}` : "2px solid transparent",
-                  color:tab===t.id ? T.accent : T.muted, fontSize:8, fontFamily:"Space Mono",
-                  cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-                <span style={{ fontSize:13 }}>{t.icon}</span>
+          <div style={{ display: "flex", background: C.card, borderBottom: `1px solid ${C.rim}`, flexShrink: 0 }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => openTab(t.id)} style={{
+                flex: 1, padding: "10px 4px 8px", background: tab === t.id ? `${C.cyan}12` : "transparent",
+                borderBottom: tab === t.id ? `2px solid ${C.cyan}` : "2px solid transparent",
+                color: tab === t.id ? C.cyan : C.dim, fontSize: 9,
+                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                position: "relative", transition: "all 0.15s",
+              }}>
+                <span style={{ fontSize: 15 }}>{t.emoji}</span>
                 {t.label}
-                {t.id === "alerts" && alerts.filter(a => a.level !== "INFO").length > 0 && (
-                  <span style={{ background:T.red, color:"#fff", borderRadius:8, padding:"0 4px", fontSize:8 }}>
-                    {alerts.filter(a => a.level !== "INFO").length}
-                  </span>
-                )}
+                {(t.badge || 0) > 0 && <span style={{ position: "absolute", top: 4, right: 6, background: C.rose, color: "#fff", borderRadius: 99, padding: "0 4px", fontSize: 7, fontWeight: 700 }}>{t.badge}</span>}
               </button>
             ))}
           </div>
-
-          {/* Panel content */}
-          <div style={{ flex:1, overflowY:"auto", padding:14 }}>
-
-            {/* ── MAP tab ─ placeholder; full map on right ── */}
-            {tab === "map" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <Card>
-                  <SectionHead label="YOUR POSITION" icon="📍" />
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                    {[
-                      { l:"LAT",    v: shipment.lat?.toFixed(4) },
-                      { l:"LNG",    v: shipment.lng?.toFixed(4) },
-                      { l:"SPEED",  v: `${shipment.speed} km/h` },
-                      { l:"STATUS", v: shipment.status, c: shipment.status==="DIVERTING" ? T.orange : shipment.status==="STOPPED" ? T.muted : T.green },
-                    ].map(({ l, v, c }) => (
-                      <div key={l}>
-                        <div style={{ color:T.muted, fontSize:8, letterSpacing:1 }}>{l}</div>
-                        <div style={{ color:c||T.text, fontSize:11, marginTop:2 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-
-                <Card>
-                  <SectionHead label="NEAREST HUB" icon="🏭" />
-                  {topHub ? (
-                    <div>
-                      <div style={{ color:T.text, fontSize:12, fontWeight:"bold", marginBottom:4 }}>{topHub.name}</div>
-                      <div style={{ color:T.muted, fontSize:10, marginBottom:8 }}>{topHub.distKm} km · {topHub.etaMins} min ETA</div>
-                      <div style={{ background:`${T.green}20`, border:`1px solid ${T.green}40`, borderRadius:6, padding:"6px 10px", marginBottom:8 }}>
-                        <span style={{ color:T.green, fontSize:10 }}>↓ {topHub.riskReduction}% risk reduction if diverted</span>
-                      </div>
-                      <button onClick={() => startCall(topHub)}
-                        style={{ width:"100%", background:T.accentDim, border:`1px solid ${T.accent}`, borderRadius:6, color:T.accent, fontSize:10, padding:"7px", cursor:"pointer" }}>
-                        📞 CALL HUB
-                      </button>
-                    </div>
-                  ) : <div style={{ color:T.muted, fontSize:11 }}>Fetching hubs…</div>}
-                </Card>
-
-                <RiskBar score={shipment.riskScore} />
-              </div>
-            )}
-
-            {/* ── SHIPMENT tab ── */}
-            {tab === "shipment" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                {/* ID card */}
-                <div style={{ background:`linear-gradient(135deg,#00D4FF18,transparent)`, border:`1px solid #00D4FF30`, borderRadius:10, padding:"14px 16px" }}>
-                  <div style={{ fontSize:18, fontWeight:"bold", color:T.text }}>{shipment.id}</div>
-                  <div style={{ color:T.muted, fontSize:10, marginTop:2 }}>💉 {shipment.cargo}</div>
-                  <div style={{ color:T.muted, fontSize:10, marginTop:6 }}>
-                    <span style={{ color:T.text }}>{shipment.from}</span>
-                    <span style={{ color:T.dim, margin:"0 6px" }}>━▶</span>
-                    <span style={{ color:T.text }}>{shipment.to}</span>
-                  </div>
-                  {/* Progress */}
-                  <div style={{ marginTop:12 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                      <span style={{ color:T.muted, fontSize:9 }}>JOURNEY PROGRESS</span>
-                      <span style={{ color:T.accent, fontSize:9 }}>{Math.round(shipment.progress*100)}%</span>
-                    </div>
-                    <div style={{ height:5, background:T.border, borderRadius:3, overflow:"hidden" }}>
-                      <div style={{ height:"100%", width:`${Math.round(shipment.progress*100)}%`, background:`linear-gradient(90deg,#00D4FF,${T.green})`, borderRadius:3 }} />
-                    </div>
-                  </div>
-                </div>
-
-                <Card>
-                  <SectionHead label="LIVE SENSORS" icon="📡" />
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:10 }}>
-                    {[
-                      { l:"TEMP",        v:`${shipment.temp}°C`,       c: shipment.isIdeal ? T.green : T.red },
-                      { l:"IDEAL RANGE", v: shipment.idealTemp,         c: T.muted },
-                      { l:"HUMIDITY",    v:`${shipment.humidity}%`,     c: T.accent },
-                      { l:"BATTERY",     v:`${shipment.battery}%`,      c: shipment.battery>50 ? T.green : T.orange },
-                      { l:"COMPRESSOR",  v: shipment.compressor,        c: shipment.compressor==="RUNNING" ? T.green : T.red },
-                      { l:"DOOR EVENTS", v: shipment.doorEvents,        c: shipment.doorEvents > 3 ? T.orange : T.text },
-                    ].map(({ l, v, c }) => (
-                      <div key={l} style={{ background:T.bg, borderRadius:6, padding:"8px 10px" }}>
-                        <div style={{ color:T.muted, fontSize:8, letterSpacing:1 }}>{l}</div>
-                        <div style={{ color:c, fontSize:11, marginTop:2 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-
-                <Card>
-                  <SectionHead label="CARGO VALUE" icon="💰" />
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ color:T.green, fontSize:20, fontWeight:"bold" }}>
-                      ₹{(shipment.cargoValue/100000).toFixed(1)}L
-                    </span>
-                    <span style={{ color: shipment.riskLevel==="LOW" ? T.green : T.orange, fontSize:10, border:`1px solid currentColor`, borderRadius:4, padding:"3px 8px" }}>
-                      {shipment.riskLevel==="LOW" ? "✓ SECURED" : "⚡ MONITOR"}
-                    </span>
-                  </div>
-                </Card>
-
-                <RiskBar score={shipment.riskScore} />
-              </div>
-            )}
-
-            {/* ── HUBS tab ── */}
-            {tab === "hubs" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                <div style={{ color:T.muted, fontSize:9, letterSpacing:2, marginBottom:4 }}>TOP 3 NEARBY COLD STORAGE · BY RISK REDUCTION</div>
-                {hubs.slice(0,3).map((hub, i) => (
-                  <Card key={hub.id} style={{ borderLeft:`3px solid ${hub.color}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-                      <div>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ background:hub.color+"30", color:hub.color, fontFamily:"Space Mono", fontSize:9, padding:"2px 6px", borderRadius:3, fontWeight:"bold" }}>
-                            #{i+1}
-                          </span>
-                          <span style={{ color:T.text, fontSize:12, fontWeight:"bold" }}>{hub.name}</span>
-                        </div>
-                        <div style={{ color:T.muted, fontSize:10, marginTop:3 }}>{hub.type} · {hub.tempRange}</div>
-                      </div>
-                      <div style={{ textAlign:"right" }}>
-                        <div style={{ color:T.green, fontSize:13, fontWeight:"bold" }}>↓{hub.riskReduction}%</div>
-                        <div style={{ color:T.muted, fontSize:9 }}>risk reduction</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6, marginBottom:10 }}>
-                      {[
-                        { l:"DISTANCE",  v:`${hub.distKm} km`   },
-                        { l:"ETA",       v:`${hub.etaMins} min`  },
-                        { l:"CAPACITY",  v:`${hub.capacity}%`    },
-                      ].map(({ l, v }) => (
-                        <div key={l} style={{ background:T.bg, borderRadius:4, padding:"5px 7px" }}>
-                          <div style={{ color:T.muted, fontSize:8 }}>{l}</div>
-                          <div style={{ color:T.text, fontSize:10, marginTop:1 }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div style={{ display:"flex", gap:8 }}>
-                      <button
-                        onClick={() => startCall(hub)}
-                        style={{ flex:1, background:T.accentDim, border:`1px solid ${T.accent}`, borderRadius:6, color:T.accent, fontSize:10, padding:"7px", cursor:"pointer" }}>
-                        📞 CALL
-                      </button>
-                      <button
-                        style={{ flex:1, background:"transparent", border:`1px solid ${T.border}`, borderRadius:6, color:T.muted, fontSize:10, padding:"7px", cursor:"pointer" }}>
-                        🗺 NAVIGATE
-                      </button>
-                    </div>
-                  </Card>
-                ))}
-                {hubs.length === 0 && (
-                  <div style={{ color:T.muted, fontSize:11, textAlign:"center", padding:40 }}>Fetching nearby hubs…</div>
-                )}
-              </div>
-            )}
-
-            {/* ── ALERTS tab ── */}
-            {tab === "alerts" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                <div style={{ color:T.muted, fontSize:9, letterSpacing:2, marginBottom:4 }}>LIVE ALERTS · REAL-TIME UPDATES</div>
-                {alerts.length === 0 && (
-                  <div style={{ color:T.muted, textAlign:"center", padding:40, fontSize:11 }}>
-                    ✅ No active alerts
-                  </div>
-                )}
-                {alerts.map(a => {
-                  const levelColor = a.level === "DANGER" ? T.red : a.level === "WARNING" ? T.orange : T.accent;
-                  return (
-                    <div key={a.id} style={{ background:T.surface, border:`1px solid ${levelColor}40`, borderLeft:`3px solid ${levelColor}`, borderRadius:8, padding:"10px 12px" }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                        <span style={{ color:levelColor, fontSize:9, fontWeight:"bold", letterSpacing:1 }}>{a.level}</span>
-                        <span style={{ color:T.muted, fontSize:9 }}>{a.time}</span>
-                      </div>
-                      <div style={{ color:T.text, fontSize:11, lineHeight:1.5 }}>{a.msg}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── CALLS tab ── */}
-            {tab === "calls" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                <SectionHead label="COLD STORAGE CONTACTS" icon="📞" />
-
-                {/* Active call */}
-                {callState.active && (
-                  <div style={{ background:T.green+"15", border:`1px solid ${T.green}40`, borderRadius:10, padding:"16px" }}>
-                    <div style={{ color:T.green, fontSize:9, letterSpacing:2, marginBottom:6 }}>● CALL IN PROGRESS</div>
-                    <div style={{ color:T.text, fontSize:14, fontWeight:"bold" }}>{callState.hubName}</div>
-                    <div style={{ color:T.muted, fontSize:10, marginTop:2 }}>{callState.phone}</div>
-                    <div style={{ color:T.green, fontSize:22, fontFamily:"Space Mono", margin:"10px 0", textAlign:"center" }}>
-                      {fmtDur(callState.elapsed)}
-                    </div>
-                    <button onClick={endCall}
-                      style={{ width:"100%", background:T.red+"30", border:`1px solid ${T.red}`, borderRadius:6, color:T.red, fontSize:11, fontWeight:"bold", padding:"9px", cursor:"pointer" }}>
-                      END CALL
-                    </button>
-                  </div>
-                )}
-
-                {/* Top 3 hubs dial pad */}
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {hubs.slice(0,3).map((hub, i) => (
-                    <div key={hub.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:"10px 14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <div>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span style={{ color:hub.color, fontSize:9, background:hub.color+"20", padding:"1px 6px", borderRadius:3 }}>#{i+1}</span>
-                          <span style={{ color:T.text, fontSize:11, fontWeight:"bold" }}>{hub.name}</span>
-                        </div>
-                        <div style={{ color:T.muted, fontSize:9, marginTop:2 }}>{hub.phone}</div>
-                        <div style={{ color:T.green, fontSize:9, marginTop:2 }}>↓{hub.riskReduction}% risk · {hub.distKm} km</div>
-                      </div>
-                      <button
-                        onClick={() => startCall(hub)}
-                        disabled={callState.active}
-                        style={{ background:callState.active ? T.dim : T.accentDim, border:`1px solid ${callState.active ? T.dim : T.accent}`, borderRadius:6, color:callState.active ? T.muted : T.accent, fontSize:9, padding:"8px 12px", cursor:callState.active ? "not-allowed" : "pointer" }}>
-                        📞 CALL
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Call log */}
-                {callLog.length > 0 && (
-                  <>
-                    <div style={{ color:T.muted, fontSize:9, letterSpacing:2, marginTop:4 }}>RECENT CALLS</div>
-                    {callLog.map(c => (
-                      <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:6, padding:"8px 12px", display:"flex", justifyContent:"space-between" }}>
-                        <div>
-                          <div style={{ color:T.text, fontSize:11 }}>{c.name}</div>
-                          <div style={{ color:T.muted, fontSize:9 }}>{c.phone}</div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ color:T.muted, fontSize:9 }}>{c.time}</div>
-                          <div style={{ color:T.accent, fontSize:9 }}>{fmtDur(c.dur)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-
-          </div>
+          <PanelContent />
         </div>
 
-        {/* ── Right: Live Leaflet Map ── */}
-        <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
-          <MapContainer
-            center={[shipment.lat, shipment.lng]}
-            zoom={6}
-            style={{ width:"100%", height:"100%" }}
-            zoomControl={true}
-          >
+        {/* ── MAP ── */}
+        <div className="dp-map" style={{ flex: 1, position: "relative" }}>
+          <MapContainer center={[ship.lat, ship.lng]} zoom={7} style={{ width: "100%", height: "100%" }} zoomControl={false}>
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
             />
+            {crumbs.length > 1 && <Polyline positions={crumbs} pathOptions={{ color: C.slate, weight: 2, opacity: 0.4, dashArray: "4 5" }} />}
+            {route.length > 1  && <Polyline positions={route}  pathOptions={{ color: C.cyan,  weight: 3, opacity: 0.8 }} />}
 
-            {/* Planned route polyline */}
-            {shipment.routePath && shipment.routePath.length > 1 && (
-              <Polyline
-                positions={shipment.routePath}
-                pathOptions={{ color: "#00D4FF", weight: 3, opacity: 0.5, dashArray: "8 6" }}
-              />
-            )}
-
-            {/* Truck position */}
-            <Marker position={[shipment.lat, shipment.lng]} icon={truckIcon}>
+            {/* Truck */}
+            <Marker position={[ship.lat, ship.lng]} icon={truckIcon(rc)}>
               <Popup>
-                <div style={{ fontFamily:"monospace", fontSize:12 }}>
-                  <strong>{shipment.id}</strong><br />
-                  {shipment.cargo} · {shipment.temp}°C<br />
-                  Risk: {shipment.riskLevel}<br />
-                  Speed: {shipment.speed} km/h
+                <div style={{ fontFamily: "monospace", fontSize: 12, minWidth: 160 }}>
+                  <b>{ship.shipmentId}</b><br />
+                  {ship.cargo} · <span style={{ color: ship.isIdeal ? "green" : "red" }}>{ship.temp}°C</span><br />
+                  {ship.from} → {ship.to}<br />
+                  Risk: {ship.riskLevel} · Speed: {ship.speed} km/h
                 </div>
               </Popup>
             </Marker>
 
-            {/* Cold hub markers */}
-            {hubs.slice(0,3).map((hub, i) => (
-              <Marker key={hub.id} position={[hub.lat, hub.lng]} icon={makeHubIcon(hub.color)}>
+            {/* Hub markers — always visible, show risk reduction on marker */}
+            {hubs.slice(0, 3).map((hub, i) => (
+              <Marker key={hub.id} position={[hub.lat, hub.lng]} icon={hubIcon(hub.color, i + 1, hub.riskReduction)}>
                 <Popup>
-                  <div style={{ fontFamily:"monospace", fontSize:12 }}>
-                    <strong>#{i+1} {hub.name}</strong><br />
+                  <div style={{ fontFamily: "monospace", fontSize: 12, minWidth: 170 }}>
+                    <b>#{i + 1} {hub.name}</b><br />
                     {hub.type} · {hub.tempRange}<br />
-                    ↓{hub.riskReduction}% risk reduction<br />
-                    {hub.distKm} km · {hub.etaMins} min ETA<br />
-                    Capacity: {hub.capacity}%
+                    Risk reduction: <b style={{ color: "green" }}>↓{hub.riskReduction}%</b><br />
+                    {hub.distKm} km · {hub.etaMins} min ETA · {hub.capacity}% capacity
                   </div>
                 </Popup>
               </Marker>
             ))}
 
-            {/* Diversion lines: truck → each hub */}
-            {hubs.slice(0,3).map((hub) => (
-              <Polyline
-                key={"line-" + hub.id}
-                positions={[[shipment.lat, shipment.lng], [hub.lat, hub.lng]]}
-                pathOptions={{ color: hub.color, weight: 1.5, opacity: 0.35, dashArray: "4 6" }}
+            {/* Diversion lines */}
+            {hubs.slice(0, 3).map(hub => (
+              <Polyline key={"dl-" + hub.id}
+                positions={[[ship.lat, ship.lng], [hub.lat, hub.lng]]}
+                pathOptions={{ color: hub.color, weight: 1.5, opacity: 0.35, dashArray: "5 8" }}
               />
             ))}
 
-            {/* Auto-pan as truck moves */}
-            <FlyTo lat={shipment.lat} lng={shipment.lng} />
+            <FlyTo lat={ship.lat} lng={ship.lng} />
           </MapContainer>
 
-          {/* Map overlay: risk info */}
-          <div style={{ position:"absolute", top:12, right:12, zIndex:1000, background:"rgba(6,12,20,0.88)", border:`1px solid ${riskColor}50`, borderRadius:8, padding:"10px 14px", minWidth:160 }}>
-            <div style={{ color:riskColor, fontSize:9, letterSpacing:2, marginBottom:6 }}>● {shipment.riskLevel} RISK</div>
-            <div style={{ color:T.text, fontSize:12, fontWeight:"bold" }}>{shipment.cargo}</div>
-            <div style={{ color:T.muted, fontSize:10, marginTop:2 }}>{shipment.from} → {shipment.to}</div>
-            <div style={{ color: shipment.isIdeal ? T.green : T.red, fontSize:13, fontWeight:"bold", marginTop:6 }}>
-              {shipment.temp}°C
+          {/* Info chip top-right */}
+          <div style={{ position: "absolute", top: 12, right: 12, zIndex: 900, background: "rgba(7,16,28,0.88)", backdropFilter: "blur(6px)", border: `1px solid ${rc}40`, borderRadius: 10, padding: "10px 14px", minWidth: 155, pointerEvents: "none" }}>
+            <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: rc, boxShadow: `0 0 6px ${rc}` }} />
+              <span style={{ color: rc, fontSize: 9, fontFamily: "monospace", letterSpacing: 1 }}>{ship.riskLevel} RISK</span>
             </div>
-            <div style={{ color:T.muted, fontSize:9 }}>Safe: {shipment.idealTemp}</div>
+            <div style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{ship.cargo}</div>
+            <div style={{ color: C.slate, fontSize: 10, margin: "2px 0 6px" }}>{ship.from} → {ship.to}</div>
+            <div style={{ color: ship.isIdeal ? C.green : C.rose, fontSize: 18, fontWeight: 700, fontFamily: "monospace" }}>{ship.temp}°C</div>
+            <div style={{ color: C.dim, fontSize: 9, fontFamily: "monospace" }}>safe {ship.idealTemp}</div>
           </div>
 
-          {/* Legend */}
-          <div style={{ position:"absolute", bottom:12, left:12, zIndex:1000, background:"rgba(6,12,20,0.85)", border:`1px solid ${T.border}`, borderRadius:8, padding:"8px 12px" }}>
-            <div style={{ color:T.muted, fontSize:8, letterSpacing:2, marginBottom:6 }}>LEGEND</div>
-            {[
-              { c:T.green,  l:"LOW RISK TRUCK"   },
-              { c:T.orange, l:"MED RISK TRUCK"   },
-              { c:T.red,    l:"HIGH RISK TRUCK"  },
-              { c:"#00D4FF",l:"HUB #1 (BEST)"    },
-              { c:"#8b5cf6",l:"HUB #2"           },
-              { c:"#00FF88",l:"HUB #3"           },
-            ].map(({ c, l }) => (
-              <div key={l} style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
-                <div style={{ width:8, height:8, borderRadius:"50%", background:c }} />
-                <span style={{ color:T.muted, fontSize:8 }}>{l}</span>
+          {/* Hub legend bottom-left */}
+          <div style={{ position: "absolute", bottom: 12, left: 12, zIndex: 900, background: "rgba(7,16,28,0.85)", backdropFilter: "blur(6px)", border: `1px solid ${C.rim}`, borderRadius: 9, padding: "9px 13px", pointerEvents: "none" }}>
+            <div style={{ color: C.slate, fontSize: 8, fontFamily: "monospace", letterSpacing: 2, marginBottom: 7 }}>HUBS</div>
+            {hubs.slice(0, 3).map((hub, i) => (
+              <div key={hub.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 3, background: hub.color, flexShrink: 0 }} />
+                <span style={{ color: C.slate, fontSize: 9 }}>#{i + 1} {hub.name.split(" ")[0]}</span>
+                <span style={{ color: C.green, fontSize: 9, fontFamily: "monospace", marginLeft: "auto", paddingLeft: 6 }}>↓{hub.riskReduction}%</span>
               </div>
             ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${C.rim}` }}>
+              <div style={{ width: 20, height: 2, background: C.cyan, borderRadius: 1 }} />
+              <span style={{ color: C.slate, fontSize: 9 }}>Route ahead</span>
+            </div>
           </div>
+
+          {/* Mobile tab bar — floats over map */}
+          <div className="dp-mobile-tabs">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => openTab(t.id)} style={{
+                flex: 1, padding: "7px 4px", background: tab === t.id ? `${C.cyan}20` : C.card,
+                borderTop: `2px solid ${tab === t.id ? C.cyan : C.rim}`,
+                color: tab === t.id ? C.cyan : C.slate, fontSize: 8,
+                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                position: "relative",
+              }}>
+                <span style={{ fontSize: 16 }}>{t.emoji}</span>
+                {t.label}
+                {(t.badge || 0) > 0 && <span style={{ position: "absolute", top: 3, right: "20%", background: C.rose, color: "#fff", borderRadius: 99, padding: "0 4px", fontSize: 7, fontWeight: 700 }}>{t.badge}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── MOBILE BOTTOM DRAWER ── */}
+        <div className={`dp-drawer${drawer ? " dp-drawer-open" : ""}`}>
+          <div style={{ display: "flex", alignItems: "center", padding: "10px 16px 4px", flexShrink: 0 }}>
+            <div style={{ flex: 1, height: 3, width: 40, background: C.rim, borderRadius: 99, margin: "0 auto 4px", maxWidth: 40 }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px 10px" }}>
+            <span style={{ color: C.text, fontWeight: 600, fontSize: 14 }}>
+              {TABS.find(t => t.id === tab)?.label}
+            </span>
+            <button onClick={() => setDrawer(false)} style={{ background: "none", border: "none", color: C.slate, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
+          </div>
+          <PanelContent />
         </div>
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
-        * { box-sizing:border-box; }
-        ::-webkit-scrollbar { width:4px; }
-        ::-webkit-scrollbar-track { background:${T.bg}; }
-        ::-webkit-scrollbar-thumb { background:${T.border}; border-radius:2px; }
-        @keyframes pulse {
-          0%,100% { opacity:1; box-shadow:0 0 4px currentColor; }
-          50%      { opacity:0.4; box-shadow:0 0 14px currentColor; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: ${C.rim}; border-radius: 2px; }
+        .leaflet-container { background: #060e1a !important; }
+        .leaflet-tile { filter: brightness(0.78) saturate(0.5) hue-rotate(200deg); }
+        .leaflet-control-zoom, .leaflet-control-attribution { display: none; }
+        @keyframes lc-ping {
+          0%   { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(2.8); opacity: 0; }
         }
-        .leaflet-container { background:#070F1A !important; }
-        .leaflet-tile { filter: brightness(0.85) saturate(0.6) hue-rotate(190deg); }
+
+        /* ── Desktop ── */
+        .dp-body          { flex-direction: row; }
+        .dp-desk-panel    { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; background: ${C.bg}; border-right: 1px solid ${C.rim}; }
+        .dp-map           { flex: 1; position: relative; }
+        .dp-mobile-tabs   { display: none; }
+        .dp-drawer        { display: none; }
+
+        /* ── Mobile ≤ 768 ── */
+        @media (max-width: 768px) {
+          .dp-body       { flex-direction: column; }
+          .dp-desk-panel { display: none; }
+          .dp-map        { flex: 1; height: 100%; }
+
+          .dp-mobile-tabs {
+            display: flex;
+            position: absolute; bottom: 0; left: 0; right: 0;
+            z-index: 800; border-top: 1px solid ${C.rim};
+          }
+
+          .dp-drawer {
+            display: flex; flex-direction: column;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 66svh; z-index: 1000;
+            background: ${C.bg}; border-radius: 16px 16px 0 0;
+            border-top: 1px solid ${C.rim};
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+            overflow: hidden;
+          }
+          .dp-drawer.dp-drawer-open { transform: translateY(0); }
+        }
       `}</style>
     </div>
   );
