@@ -3,11 +3,11 @@ import { useNavigate, Link } from "react-router-dom";
 import { Truck, Building, Shield, Mail, Lock } from "lucide-react";
 
 const LiveColdLogin = () => {
-  const [role, setRole] = useState("driver");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [role, setRole]       = useState("driver");
+  const [email, setEmail]     = useState("");
+  const [password, setPassword]     = useState("");
+  const [error, setError]           = useState("");
+  const [isLoading, setIsLoading]   = useState(false);
   const navigate = useNavigate();
 
   const roles = [
@@ -151,7 +151,9 @@ const LiveColdLogin = () => {
                 disabled={isLoading}
                 className="w-full mt-2 bg-[#111827] border border-[#1c2d45] hover:border-[#22d3ee] text-[#22d3ee] font-mono font-bold py-3 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 text-sm"
               >
-                {isLoading ? "VERIFYING..." : "LOGIN"}
+                {isLoading
+                  ? "VERIFYING..."
+                  : "LOGIN"}
               </button>
             </form>
 

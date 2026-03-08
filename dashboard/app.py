@@ -9,12 +9,18 @@ import threading
 import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, Response, request
+from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import queue
 import time
 import os
 import litellm
 from dotenv import load_dotenv
+
+# Import authentication and models
+from .auth_routes import auth_bp
+from .auth import initialize_super_admin
+from .models import init_db
 
 load_dotenv()
 
@@ -23,6 +29,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("dashboard")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# Configure CORS
+cors_origins = os.getenv("CORS_ORIGIN", "http://localhost:5173,http://localhost:3000,http://localhost:5050").split(",")
+CORS(
+    app,
+    origins=cors_origins,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    supports_credentials=True,
+    max_age=3600,
+)
+
+# Initialize database
+init_db()
+initialize_super_admin()
+
+# Register authentication blueprint
+app.register_blueprint(auth_bp)
 
 # ── Global State ────────────────────────────────────────────────
 shipments = {}      # shipment_id -> latest state
