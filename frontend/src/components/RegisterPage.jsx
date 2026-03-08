@@ -1,212 +1,336 @@
+/**
+ * RegisterPage.jsx
+ *
+ * BUG FIX: Field is defined at MODULE level — never inside RegisterPage.
+ * Defining a component inside its parent causes React to unmount/remount
+ * the <input> on every keystroke, losing focus after each character.
+ */
+
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import {
-  Truck, Building, User, Mail, Lock, Phone, Fingerprint,
-  MapPin, ChevronRight, CheckCircle,
-} from "lucide-react";
+import { Truck, Building, User, Mail, Lock, Phone, Fingerprint, MapPin, ChevronRight, Eye, EyeOff } from "lucide-react";
 
-const RegisterPage = () => {
-  const [role, setRole]       = useState("driver");
-  const [step, setStep]       = useState(1); // 1 = role & identity, 2 = details
-  const [done, setDone]       = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-
-  // shared
-  const [name,     setName]     = useState("");
-  const [email,    setEmail]    = useState("");
-  const [phone,    setPhone]    = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm,  setConfirm]  = useState("");
-
-  // driver specific
-  const [vehicleId, setVehicleId] = useState("");
-  const [licenseNo, setLicenseNo] = useState("");
-
-  // company specific
-  const [companyName, setCompanyName] = useState("");
-  const [gstNo,       setGstNo]       = useState("");
-  const [city,        setCity]        = useState("");
-
-  const navigate = useNavigate();
-
-  const handleNext = (e) => {
-    e.preventDefault();
-    setError("");
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      setError("Please fill all required fields."); return;
-    }
-    setStep(2);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (password !== confirm) { setError("Passwords do not match."); return; }
-    if (password.length < 6)  { setError("Password must be at least 6 characters."); return; }
-
-    setLoading(true);
-    // ── FRONTEND TESTING MODE ─────────────────────────────────────────────
-    // TODO: replace with real POST /api/auth/register call
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
-    setDone(true);
-    // ─────────────────────────────────────────────────────────────────────
-  };
-
-  const Field = ({ label, icon: Icon, ...props }) => (
-    <div>
-      <label className="block text-xs uppercase tracking-wider text-[#7a90a8] font-mono mb-1.5">{label}</label>
-      <div className="relative">
-        {Icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#3d5470]">
-            <Icon size={14} />
-          </div>
-        )}
-        <input
-          {...props}
-          className={`w-full bg-[#070b14] border border-[#1c2d45] text-[#dde6f0] rounded-md py-2.5 text-sm focus:outline-none focus:border-[#22d3ee] transition-colors ${Icon ? "pl-9 pr-3" : "px-3"}`}
-        />
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="dark">
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#070b14] text-[#dde6f0] p-4">
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#38bdf8] opacity-5 blur-[120px] rounded-full" />
-        </div>
-
-        <div className="w-full max-w-md bg-[#0c1220] border border-[#1c2d45] rounded-xl shadow-2xl relative z-10 overflow-hidden">
-          {/* Header */}
-          <div className="flex flex-col items-center p-7 pb-5 border-b border-[#1c2d45] bg-[#111827]">
-            <div className="font-mono text-xl font-bold text-[#38bdf8] tracking-tight mb-1 flex items-center gap-2">
-              ❄ Live<span className="text-[#22d3ee]">Cold</span>
-            </div>
-            <p className="text-[#7a90a8] text-xs uppercase tracking-widest font-mono">
-              {done ? "Registration Complete" : `New Account · Step ${step} of 2`}
-            </p>
-          </div>
-
-          <div className="p-6">
-            {done ? (
-              /* ── Success state ── */
-              <div className="text-center py-6 flex flex-col items-center gap-4">
-                <CheckCircle size={48} className="text-[#22d3ee]" />
-                <div>
-                  <p className="text-[#dde6f0] font-mono font-bold text-lg">Account Created!</p>
-                  <p className="text-[#7a90a8] text-xs mt-1">
-                    Your {role === "driver" ? "driver" : "company"} account is pending activation.
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/")}
-                  className="mt-2 bg-[#111827] border border-[#1c2d45] hover:border-[#22d3ee] text-[#22d3ee] font-mono font-bold py-2.5 px-8 rounded-md transition-all text-sm"
-                >
-                  GO TO LOGIN
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Role selector (only step 1) */}
-                {step === 1 && (
-                  <div className="flex p-1 bg-[#070b14] border border-[#1c2d45] rounded-lg mb-5">
-                    {[
-                      { id: "driver", label: "Driver",  icon: Truck    },
-                      { id: "client", label: "Company", icon: Building },
-                    ].map(({ id, label, icon: Icon }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setRole(id)}
-                        className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-xs font-semibold rounded-md transition-all ${
-                          role === id
-                            ? "bg-[#1c2d45] text-[#22d3ee]"
-                            : "text-[#3d5470] hover:text-[#7a90a8] hover:bg-[#111827]"
-                        }`}
-                      >
-                        <Icon size={15} /> {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-950/50 border border-red-500/50 text-red-400 text-xs text-center font-mono">
-                    {error}
-                  </div>
-                )}
-
-                {/* Step 1 – Identity */}
-                {step === 1 && (
-                  <form onSubmit={handleNext} className="space-y-4">
-                    <Field label="Full Name"    icon={User}  type="text"  value={name}  onChange={e => setName(e.target.value)}  placeholder="Rajesh Kumar" required />
-                    <Field label="Email"        icon={Mail}  type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
-                    <Field label="Phone Number" icon={Phone} type="tel"   value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 98XXX XXXXX" required />
-
-                    {role === "driver" ? (
-                      <Field label="Vehicle / Registration No." icon={Truck} type="text" value={vehicleId} onChange={e => setVehicleId(e.target.value)} placeholder="HR 26DQ5551" required />
-                    ) : (
-                      <Field label="Company Name" icon={Building} type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="AgroFreeze Pvt Ltd" required />
-                    )}
-
-                    <button
-                      type="submit"
-                      className="w-full mt-2 bg-[#111827] border border-[#1c2d45] hover:border-[#22d3ee] text-[#22d3ee] font-mono font-bold py-3 rounded-md transition-all flex justify-center items-center gap-2 text-sm"
-                    >
-                      NEXT <ChevronRight size={14} />
-                    </button>
-                  </form>
-                )}
-
-                {/* Step 2 – Credentials & extras */}
-                {step === 2 && (
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    {role === "driver" ? (
-                      <Field label="Driving Licence No." icon={Fingerprint} type="text" value={licenseNo} onChange={e => setLicenseNo(e.target.value)} placeholder="DL-1234567890123" />
-                    ) : (
-                      <>
-                        <Field label="GST Number (optional)" icon={Building} type="text" value={gstNo} onChange={e => setGstNo(e.target.value)} placeholder="22AAAAA0000A1Z5" />
-                        <Field label="City / HQ Location" icon={MapPin} type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Delhi" />
-                      </>
-                    )}
-
-                    <Field label="Password"        icon={Lock} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 characters" required />
-                    <Field label="Confirm Password" icon={Lock} type="password" value={confirm}  onChange={e => setConfirm(e.target.value)}  placeholder="Repeat password" required />
-
-                    <div className="flex gap-3 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => setStep(1)}
-                        className="flex-1 bg-[#0c1220] border border-[#1c2d45] text-[#7a90a8] font-mono font-bold py-3 rounded-md transition-all text-sm hover:border-[#3d5470]"
-                      >
-                        ← BACK
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex-2 flex-grow-[2] bg-[#111827] border border-[#1c2d45] hover:border-[#22d3ee] text-[#22d3ee] font-mono font-bold py-3 rounded-md transition-all disabled:opacity-50 text-sm"
-                      >
-                        {loading ? "CREATING..." : "CREATE ACCOUNT"}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                <div className="mt-5 pt-4 border-t border-[#1c2d45] text-center">
-                  <span className="text-[#3d5470] text-xs font-mono">Already registered? </span>
-                  <Link to="/" className="text-[#22d3ee] text-xs font-mono hover:underline">
-                    Sign in →
-                  </Link>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+const C = {
+  bg:   "#07101c", card:  "#0e1d2e", rim:   "#162840",
+  cyan: "#2dd4bf", text:  "#e2e8f0", slate: "#94a3b8",
+  dim:  "#334155", green: "#4ade80", rose:  "#f87171",
 };
 
-export default RegisterPage;
+// ─── Field — module level, never moves ────────────────────────────────────────
+function Field({ label, icon: Icon, err, hint, showToggle, showPw, onToggle, ...rest }) {
+  const [focused, setFocused] = React.useState(false);
+  const borderCol = err ? C.rose : focused ? C.cyan : C.rim;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <label style={{ color: C.slate, fontSize: 11, fontFamily: "monospace", letterSpacing: 0.5 }}>{label}</label>
+      <div style={{ position: "relative" }}>
+        {Icon && (
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: C.dim, display: "flex", pointerEvents: "none" }}>
+            <Icon size={14} />
+          </span>
+        )}
+        <input
+          {...rest}
+          onFocus={e => { setFocused(true); rest.onFocus?.(e); }}
+          onBlur={e  => { setFocused(false); rest.onBlur?.(e); }}
+          style={{
+            width: "100%", background: "#060e1a",
+            border: `1px solid ${borderCol}`,
+            borderRadius: 8, color: C.text, fontSize: 13,
+            padding: `10px ${showToggle ? "36px" : "12px"} 10px ${Icon ? "34px" : "12px"}`,
+            outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+            transition: "border-color 0.2s",
+          }}
+        />
+        {showToggle && (
+          <button type="button" onClick={onToggle} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: C.dim, display: "flex", padding: 0 }}>
+            {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        )}
+      </div>
+      {err  && <span style={{ color: C.rose,  fontSize: 11, fontFamily: "monospace" }}>{err}</span>}
+      {hint && !err && <span style={{ color: C.dim, fontSize: 10 }}>{hint}</span>}
+    </div>
+  );
+}
+
+// ─── Password strength ─────────────────────────────────────────────────────────
+function StrengthBar({ pw }) {
+  if (!pw) return null;
+  const checks = [
+    { ok: pw.length >= 8,          label: "8+ chars"  },
+    { ok: /[A-Z]/.test(pw),        label: "uppercase" },
+    { ok: /\d/.test(pw),           label: "number"    },
+    { ok: /[^A-Za-z0-9]/.test(pw), label: "symbol"    },
+  ];
+  const score = checks.filter(c => c.ok).length;
+  const col   = [C.rose, C.rose, "#f97316", "#facc15", C.green][score];
+  const word  = ["", "Weak", "Fair", "Good", "Strong"][score];
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ flex: 1, height: 3, borderRadius: 99, background: i < score ? col : C.rim, transition: "background 0.3s" }} />
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          {checks.map(c => (
+            <span key={c.label} style={{ fontSize: 9, fontFamily: "monospace", color: c.ok ? C.green : C.dim }}>
+              {c.ok ? "✓" : "○"} {c.label}
+            </span>
+          ))}
+        </div>
+        {word && <span style={{ fontSize: 10, color: col, fontFamily: "monospace", fontWeight: 700 }}>{word}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Step dots ─────────────────────────────────────────────────────────────────
+function StepDots({ step }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 22 }}>
+      {[1,2].map((n, i) => (
+        <React.Fragment key={n}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%",
+              background: step >= n ? C.cyan : C.rim,
+              color:      step >= n ? "#07101c" : C.dim,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 700, fontFamily: "monospace",
+              transition: "all 0.25s",
+            }}>{n}</div>
+            <div style={{ color: step >= n ? C.cyan : C.dim, fontSize: 8, fontFamily: "monospace" }}>
+              {n === 1 ? "Identity" : "Credentials"}
+            </div>
+          </div>
+          {i < 1 && <div style={{ flex: 1, height: 2, background: step > 1 ? C.cyan : C.rim, marginBottom: 14, transition: "background 0.3s", marginLeft: 4, marginRight: 4 }} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+export default function RegisterPage() {
+  const navigate = useNavigate();
+  const [role,        setRole]        = useState("driver");
+  const [step,        setStep]        = useState(1);
+  const [done,        setDone]        = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [showPw,      setShowPw]      = useState(false);
+  const [showCf,      setShowCf]      = useState(false);
+  const [errors,      setErrors]      = useState({});
+
+  const [name,        setName]        = useState("");
+  const [email,       setEmail]       = useState("");
+  const [phone,       setPhone]       = useState("");
+  const [vehicleId,   setVehicleId]   = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [licenseNo,   setLicenseNo]   = useState("");
+  const [gstNo,       setGstNo]       = useState("");
+  const [city,        setCity]        = useState("");
+  const [password,    setPassword]    = useState("");
+  const [confirm,     setConfirm]     = useState("");
+
+  const isEmail   = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const isPhone   = v => /^\+?[\d\s()\-]{10,}$/.test(v);
+  const isVehicle = v => /^[A-Z]{2}\s?\d{2}\s?[A-Z]{1,3}\s?\d{4}$/i.test(v.trim());
+
+  const v1 = () => {
+    const e = {};
+    if (!name.trim())                  e.name        = "Name is required";
+    if (!isEmail(email))               e.email       = "Enter a valid email";
+    if (!isPhone(phone))               e.phone       = "Enter a valid phone number";
+    if (role === "driver") {
+      if (!vehicleId.trim())           e.vehicleId   = "Vehicle number is required";
+      else if (!isVehicle(vehicleId))  e.vehicleId   = "Format: HR 26 DQ 5551";
+    } else {
+      if (!companyName.trim())         e.companyName = "Company name is required";
+    }
+    setErrors(e);
+    return !Object.keys(e).length;
+  };
+
+  const v2 = () => {
+    const e = {};
+    if (password.length < 8)            e.password = "At least 8 characters";
+    else if (!/[A-Z]/.test(password))   e.password = "Add an uppercase letter";
+    else if (!/\d/.test(password))      e.password = "Add a number";
+    else if (!/[!@#$%^&*]/.test(password)) e.password = "Add a special character (!@#$%^&*)";
+    if (!e.password && password !== confirm) e.confirm = "Passwords don't match";
+    setErrors(e);
+    return !Object.keys(e).length;
+  };
+
+  const next = (e) => { e.preventDefault(); if (v1()) { setErrors({}); setStep(2); } };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!v2()) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role,
+          name,
+          email,
+          phone,
+          password,
+          ...(role === "driver" ? { vehicleId, licenseNo } : { companyName, gstNo, city }),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDone(true);
+      } else {
+        setErrors({ form: data.message || "Registration failed." });
+      }
+    } catch (err) {
+      setErrors({ form: "Could not reach server." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const btnStyle = {
+    width: "100%", padding: "12px", borderRadius: 9, cursor: "pointer",
+    background: "#0c1825", border: `1px solid ${C.rim}`, color: C.cyan,
+    fontFamily: "monospace", fontWeight: 700, fontSize: 13,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    transition: "border-color 0.2s",
+  };
+
+  return (
+    <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, padding: 16, fontFamily: "'Outfit', sans-serif", position: "relative" }}>
+      {/* Ambient glow */}
+      <div style={{ position: "fixed", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80vw", height: "50vh", background: "#0ea5e9", opacity: 0.04, filter: "blur(120px)", borderRadius: "50%", pointerEvents: "none", zIndex: 0 }} />
+
+      <div style={{ width: "100%", maxWidth: 430, background: C.card, border: `1px solid ${C.rim}`, borderRadius: 16, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.5)", position: "relative", zIndex: 1 }}>
+        {/* Header */}
+        <div style={{ padding: "22px 28px 18px", borderBottom: `1px solid ${C.rim}`, background: "#0a1525", textAlign: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.cyan, marginBottom: 3 }}>❄ LiveCold</div>
+          <div style={{ color: C.dim, fontSize: 10, fontFamily: "monospace", letterSpacing: 3 }}>
+            {done ? "YOU'RE IN" : `CREATE ACCOUNT`}
+          </div>
+        </div>
+
+        <div style={{ padding: "24px 28px" }}>
+          {done ? (
+            <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+              <div style={{ color: C.text, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Account created</div>
+              <div style={{ color: C.slate, fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+                Your {role === "driver" ? "driver" : "company"} account is pending review.<br />
+                You'll get access once the admin approves it.
+              </div>
+              <button onClick={() => navigate("/")} style={{ ...btnStyle, width: "auto", padding: "11px 28px" }}>
+                Back to login →
+              </button>
+            </div>
+          ) : (
+            <>
+              <StepDots step={step} />
+
+              {/* Role picker — step 1 only */}
+              {step === 1 && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 20, background: "#060e1a", border: `1px solid ${C.rim}`, borderRadius: 10, padding: 4 }}>
+                  {[{ id: "driver", icon: Truck, label: "Driver" }, { id: "client", icon: Building, label: "Company" }].map(({ id, icon: Icon, label }) => (
+                    <button key={id} type="button" onClick={() => { setRole(id); setErrors({}); }} style={{
+                      flex: 1, padding: "10px 0", borderRadius: 7, cursor: "pointer",
+                      background: role === id ? C.rim : "transparent",
+                      border: `1px solid ${role === id ? C.cyan + "40" : "transparent"}`,
+                      color: role === id ? C.cyan : C.dim,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                      fontSize: 11, fontFamily: "monospace", transition: "all 0.15s",
+                    }}>
+                      <Icon size={16} />{label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {errors.form && (
+                <div style={{ background: "#280a0a", border: `1px solid ${C.rose}40`, borderRadius: 8, padding: "10px 14px", color: C.rose, fontSize: 12, fontFamily: "monospace", marginBottom: 16 }}>
+                  {errors.form}
+                </div>
+              )}
+
+              {step === 1 && (
+                <form onSubmit={next} noValidate style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <Field label="Full name" icon={User}  type="text"  value={name}  onChange={e => setName(e.target.value)}  placeholder="Rajesh Kumar"       err={errors.name}  autoComplete="name" />
+                  <Field label="Email"     icon={Mail}  type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"    err={errors.email} autoComplete="email" />
+                  <Field label="Phone"     icon={Phone} type="tel"   value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 98765 43210"    err={errors.phone} />
+                  {role === "driver" ? (
+                    <Field label="Vehicle registration" icon={Truck} type="text"
+                      value={vehicleId} onChange={e => setVehicleId(e.target.value.toUpperCase())}
+                      placeholder="HR 26 DQ 5551" err={errors.vehicleId} hint="Format: MH 12 AB 1234" />
+                  ) : (
+                    <Field label="Company name" icon={Building} type="text"
+                      value={companyName} onChange={e => setCompanyName(e.target.value)}
+                      placeholder="AgroFreeze Pvt Ltd" err={errors.companyName} />
+                  )}
+                  <button type="submit" style={btnStyle}
+                    onMouseOver={e => e.currentTarget.style.borderColor = C.cyan}
+                    onMouseOut={e  => e.currentTarget.style.borderColor = C.rim}
+                  >
+                    Continue <ChevronRight size={14} />
+                  </button>
+                </form>
+              )}
+
+              {step === 2 && (
+                <form onSubmit={submit} noValidate style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {role === "driver" ? (
+                    <Field label="Licence number (optional)" icon={Fingerprint} type="text"
+                      value={licenseNo} onChange={e => setLicenseNo(e.target.value)} placeholder="DL-1234567890123" />
+                  ) : (
+                    <>
+                      <Field label="GST number (optional)" icon={Building} type="text"
+                        value={gstNo}  onChange={e => setGstNo(e.target.value)}  placeholder="22AAAAA0000A1Z5" />
+                      <Field label="City"  icon={MapPin} type="text"
+                        value={city}   onChange={e => setCity(e.target.value)}   placeholder="Delhi" />
+                    </>
+                  )}
+                  <div>
+                    <Field label="Password" icon={Lock} type={showPw ? "text" : "password"}
+                      showToggle showPw={showPw} onToggle={() => setShowPw(p => !p)}
+                      value={password} onChange={e => setPassword(e.target.value)}
+                      placeholder="Min. 8 characters" err={errors.password} autoComplete="new-password" />
+                    <StrengthBar pw={password} />
+                  </div>
+                  <Field label="Confirm password" icon={Lock} type={showCf ? "text" : "password"}
+                    showToggle showPw={showCf} onToggle={() => setShowCf(p => !p)}
+                    value={confirm} onChange={e => setConfirm(e.target.value)}
+                    placeholder="Repeat password" err={errors.confirm} autoComplete="new-password" />
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button type="button" onClick={() => { setStep(1); setErrors({}); }} style={{ ...btnStyle, flex: 1, color: C.slate, border: `1px solid ${C.rim}` }}>
+                      ← Back
+                    </button>
+                    <button type="submit" disabled={loading} style={{ ...btnStyle, flex: 2, opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+                      onMouseOver={e => { if (!loading) e.currentTarget.style.borderColor = C.cyan; }}
+                      onMouseOut={e  => e.currentTarget.style.borderColor = C.rim}
+                    >
+                      {loading ? "Creating…" : "Create account"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.rim}`, textAlign: "center" }}>
+                <span style={{ color: C.dim, fontSize: 12 }}>Already have an account? </span>
+                <Link to="/" style={{ color: C.cyan, fontSize: 12, textDecoration: "none" }}>Sign in →</Link>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
