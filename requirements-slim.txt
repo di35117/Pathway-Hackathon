@@ -1,5 +1,6 @@
 # Requirements for LiveCold (Pathway + Demo)
 flask
+flask-cors
 paho-mqtt
 litellm
 python-dotenv
@@ -9,3 +10,7 @@ pathway
 # Local embeddings (no API calls)
 sentence-transformers
 tiktoken
+# Authentication
+pyjwt
+bcrypt
+cryptography

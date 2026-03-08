@@ -3,6 +3,7 @@ import LiveColdLogin from "./components/login";
 import RegisterPage from "./components/RegisterPage";
 import CompanyPage from "./components/CompanyPage";
 import DriverPage from "./components/DriverPage";
+import AdminPage from "./pages/AdminPage";
 
 // Simple role guard — reads role stored at login
 function RequireRole({ role, children }) {
@@ -31,6 +32,14 @@ function App() {
           element={
             <RequireRole role="driver">
               <DriverPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireRole role="admin">
+              <AdminPage />
             </RequireRole>
           }
         />

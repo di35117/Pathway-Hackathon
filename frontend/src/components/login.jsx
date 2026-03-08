@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Truck, Building, Shield, Mail, Lock, Key, Fingerprint } from "lucide-react";
+import { Truck, Building, Shield, Mail, Lock } from "lucide-react";
 
 const LiveColdLogin = () => {
-  const [role, setRole]             = useState("driver");
-  const [identifier, setIdentifier] = useState("");
+  const [role, setRole]       = useState("driver");
+  const [email, setEmail]     = useState("");
   const [password, setPassword]     = useState("");
   const [error, setError]           = useState("");
   const [isLoading, setIsLoading]   = useState(false);
@@ -21,55 +21,37 @@ const LiveColdLogin = () => {
     setError("");
     setIsLoading(true);
 
-    // ── FRONTEND TESTING MODE ──────────────────────────────────────────────
-    // Pass-through: any non-empty credentials are accepted.
-    // TODO: replace the block below with a real /api/auth/login call when
-    //       the backend is ready.
-    // ──────────────────────────────────────────────────────────────────────
-    await new Promise((r) => setTimeout(r, 600)); // simulate network latency
-
-    if (!identifier.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       setIsLoading(false);
       return;
     }
 
-    // Store a fake token + role so RequireRole guard works
-    sessionStorage.setItem("livecold_token", "test-token-" + Date.now());
-    sessionStorage.setItem("livecold_role",  role);
-    sessionStorage.setItem("livecold_id",    identifier);
-
-    if (role === "driver") navigate("/driver");
-    else if (role === "client") navigate("/company");
-    else { setError("Admin portal coming soon!"); setIsLoading(false); return; }
-
-    setIsLoading(false);
-
-    /* ── PRODUCTION: uncomment and remove the block above ─────────────────
     try {
-      const res  = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, identifier, password }),
+        body: JSON.stringify({ email, password, role }),
       });
       const data = await res.json();
       if (res.ok) {
         if (data.token) {
           sessionStorage.setItem("livecold_token", data.token);
-          sessionStorage.setItem("livecold_role",  role);
+          sessionStorage.setItem("livecold_role", data.role);
+          sessionStorage.setItem("livecold_id", data.id);
         }
         if (role === "driver") navigate("/driver");
         else if (role === "client") navigate("/company");
-        else alert("Admin portal coming soon!");
+        else if (role === "admin") navigate("/admin");
+        else setError("Unknown role. Please contact support.");
       } else {
         setError(data.message || "Invalid credentials. Please try again.");
       }
-    } catch {
+    } catch (err) {
       setError("Cannot connect to server. Please try again later.");
     } finally {
       setIsLoading(false);
     }
-    ─────────────────────────────────────────────────────────────────────── */
   };
 
   return (
@@ -125,18 +107,18 @@ const LiveColdLogin = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#7a90a8] font-mono mb-1.5">
-                  {role === "driver" ? "Driver ID / Vehicle Mark" : "Email"}
+                  Email
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#3d5470]">
-                    {role === "driver" ? <Fingerprint size={15} /> : <Mail size={15} />}
+                    <Mail size={15} />
                   </div>
                   <input
-                    type={role === "driver" ? "text" : "email"}
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-[#070b14] border border-[#1c2d45] text-[#dde6f0] rounded-md py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:border-[#22d3ee] transition-colors"
-                    placeholder={role === "driver" ? "HR 26DQ5551" : "logistics@company.com"}
+                    placeholder="your.email@example.com"
                     required
                   />
                 </div>
@@ -144,11 +126,11 @@ const LiveColdLogin = () => {
 
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#7a90a8] font-mono mb-1.5">
-                  {role === "driver" ? "Access PIN" : "Password"}
+                  Password
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#3d5470]">
-                    {role === "driver" ? <Key size={15} /> : <Lock size={15} />}
+                    <Lock size={15} />
                   </div>
                   <input
                     type="password"
@@ -168,9 +150,7 @@ const LiveColdLogin = () => {
               >
                 {isLoading
                   ? "VERIFYING..."
-                  : role === "driver"
-                    ? "START SHIFT"
-                    : "AUTHENTICATE"}
+                  : "LOGIN"}
               </button>
             </form>
 
