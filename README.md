@@ -52,58 +52,113 @@ LiveCold is an **end-to-end cold chain intelligence platform** that goes beyond 
 
 ## 🏗️ System Architecture
 
+```mermaid
+flowchart TB
+    subgraph SIM["🚚 IoT Simulation Layer (25 Trucks × 4 Sensors × Every 2s)"]
+        TS["🌡️ Temperature Sensor"]
+        GPS["📍 GPS Tracker"]
+        RF["❄️ Reefer Telemetry"]
+        DR["🚪 Door / Shock Sensor"]
+    end
+
+    subgraph MQTT["📡 MQTT Broker (Mosquitto)"]
+        T1["livecold/temp"]
+        T2["livecold/gps"]
+        T3["livecold/reefer"]
+        T4["livecold/door"]
+    end
+
+    subgraph BRAIN["🧠 Intelligence Pipeline"]
+        AD["🛡️ 4-Layer Anomaly\nDetector"]
+        RM["📈 Sigmoid Risk Model\nP(spoilage)"]
+        DO["💰 Diversion Cost\nOptimizer"]
+        ME["📊 Metrics Engine\n₹ saved • CO₂ • rates"]
+        HM["🏭 Hub Manager\n15 hubs • traffic-aware ETA\ntemp-zone • capacity"]
+    end
+
+    subgraph ACTION["⚡ Decision & Action Layer"]
+        AN["📲 Alert Notifier\nWhatsApp → Driver\nWhatsApp → Ops\nEmail → Client"]
+        GR["🔀 GPS Re-Router\nPublish to livecold/divert\nTruck changes course"]
+    end
+
+    subgraph RAG["📚 Pathway RAG Pipeline (:8765)"]
+        FS["pw.io.fs.read\n(streaming mode)"]
+        SOP["📄 SOP Document\n(Single Source of Truth)"]
+        LLM["🤖 Gemini LLM\nSOP-cited checklists"]
+    end
+
+    subgraph DASH["🌐 Presentation Layer (:5050)"]
+        MAP["🗺️ Live Dashboard\nMap • Alerts • KPIs\nRouting Mode Toggles"]
+        DRV["📱 Driver Dashboard\nMobile View\nNotification Inbox"]
+        ALY["📈 Analytics\nCarbon Credits\nAnomaly Breakdown"]
+        SED["📄 SOP Editor\nLive Edit + RAG Test"]
+    end
+
+    TS --> T1
+    GPS --> T2
+    RF --> T3
+    DR --> T4
+
+    T1 & T2 --> AD
+    AD -->|"Clean data only\n(~9% filtered)"| RM
+    RM --> DO
+    DO --> ME
+    DO -->|"DIVERT decision"| HM
+    HM --> AN
+    HM --> GR
+    GR -->|"New GPS target"| MQTT
+
+    T3 & T4 --> DASH
+    ME -->|"livecold/decisions"| DASH
+
+    SOP --> FS
+    FS --> LLM
+    LLM --> DASH
+
+    style SIM fill:#0d1b2a,stroke:#4fc3f7,stroke-width:2px,color:#e0e6f0
+    style MQTT fill:#0d1b2a,stroke:#ffc107,stroke-width:2px,color:#e0e6f0
+    style BRAIN fill:#0d1b2a,stroke:#ff5252,stroke-width:2px,color:#e0e6f0
+    style ACTION fill:#0d1b2a,stroke:#ce93d8,stroke-width:2px,color:#e0e6f0
+    style RAG fill:#0d1b2a,stroke:#81d4fa,stroke-width:2px,color:#e0e6f0
+    style DASH fill:#0d1b2a,stroke:#4caf50,stroke-width:2px,color:#e0e6f0
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        IoT SIMULATION LAYER                                │
-│   🌡️ Temperature    📍 GPS Tracker    ❄️ Reefer Unit    🚪 Door/Shock     │
-│   (25 trucks × 4 sensors × every 2 seconds = ~50 events/sec)              │
-└──────────────────────────────┬──────────────────────────────────────────────┘
-                               │ MQTT (Mosquitto)
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    INTELLIGENCE PIPELINE ("The Brain")                      │
-│                                                                             │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌─────────────┐ │
-│  │ 4-Layer      │──▶│ Sigmoid Risk │──▶│ Diversion    │──▶│ Metrics     │ │
-│  │ Anomaly      │   │ Model        │   │ Cost         │   │ Engine      │ │
-│  │ Detector     │   │ P(spoilage)  │   │ Optimizer    │   │ ₹/CO₂/Rate │ │
-│  └──────────────┘   └──────────────┘   └──────┬───────┘   └─────────────┘ │
-│         ▲                                      │                            │
-│    Reject bad                          DIVERT? │                            │
-│    sensor data                                 ▼                            │
-│                                     ┌──────────────────┐                   │
-│                                     │ Hub Manager      │                   │
-│                                     │ 15 hubs × 5      │                   │
-│                                     │ filters + traffic │                   │
-│                                     │ aware ETA         │                   │
-│                                     └────────┬─────────┘                   │
-└──────────────────────────────────────────────┼─────────────────────────────┘
-                               │               │
-                    ┌──────────┘               │
-                    ▼                          ▼
-┌──────────────────────────┐    ┌─────────────────────────────┐
-│ 📲 Alert Notifier        │    │ 🔀 GPS Re-Router             │
-│ • WhatsApp → Driver      │    │ Publishes new destination    │
-│ • WhatsApp → Ops Team    │    │ to livecold/divert           │
-│ • Email → Client         │    │ Truck physically re-routes   │
-└──────────────────────────┘    └─────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        PRESENTATION LAYER                                   │
-│                                                                             │
-│  🌐 Live Dashboard (:5050)    📱 Driver Dashboard    📈 Analytics Page     │
-│  • Real-time map (Leaflet)    • Per-shipment view    • Carbon credits      │
-│  • Alert panel + SOP reco     • Notification inbox   • Anomaly breakdown   │
-│  • KPI metrics bar            • Risk gauge           • Financial summary   │
-│  • Routing mode toggles       • Route info           • Shipment table      │
-│  • SSE live updates           • Real-time MQTT       • Product breakdown   │
-│                                                                             │
-│  📄 SOP Editor                📚 Pathway RAG Pipeline (:8765)              │
-│  • Live edit SOP document     • pw.io.fs.read(streaming) watches SOP       │
-│  • Test RAG queries           • REST API for natural language Q&A          │
-│  • See real-time sync         • Gemini LLM with SOP context               │
-└─────────────────────────────────────────────────────────────────────────────┘
+
+---
+
+## 🔄 Data Flow
+
+```mermaid
+sequenceDiagram
+    participant S as 🚚 Simulators
+    participant M as 📡 MQTT
+    participant A as 🛡️ Anomaly Detector
+    participant P as 🧠 Risk + Decision
+    participant H as 🏭 Hub Manager
+    participant R as 📚 Pathway RAG
+    participant D as 🌐 Dashboard
+
+    loop Every 2 seconds (25 trucks)
+        S->>M: Publish temp, GPS, reefer, door events
+        M->>A: livecold/temp readings
+        A->>A: L1 Bounds → L2 Rate → L3 Z-Score → L4 Stuck
+        alt Anomaly detected (~9%)
+            A--xP: ❌ Discard / use last good reading
+        else Clean reading
+            A->>P: ✅ Forward verified temp
+        end
+        P->>P: Sigmoid risk = σ(dev × 1.8 + exp × 0.2) × ETA
+        alt Risk > threshold
+            P->>H: 🚨 Find best hub (temp-zone + capacity + traffic ETA)
+            H-->>S: 🔀 DIVERT order via livecold/divert (GPS re-routes)
+            H->>D: 📲 WhatsApp to driver (hub name, Maps link, ETA)
+            D->>R: POST /v2/answer (SOP query for product)
+            R->>R: Pathway streams SOP → Gemini LLM
+            R-->>D: SOP checklist (§3.2, §4.1...)
+        else Risk ≤ threshold
+            P->>D: ✅ CONTINUE
+        end
+        M->>D: Live update map, metrics, shipment cards (SSE)
+    end
 ```
 
 ---
