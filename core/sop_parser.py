@@ -4,7 +4,7 @@ Reads the cold_chain_SOP.txt and extracts structured product temperature ranges.
 Makes the SOP the single source of truth for the entire system.
 
 Usage:
-    from sop_parser import get_product_temp_ranges, get_product_profile
+    from core.sop_parser import get_product_temp_ranges, get_product_profile
 
     ranges = get_product_temp_ranges()
     # {'Vaccines': (2, 8), 'Frozen_Meat': (-18, -12), 'Dairy': (2, 6), ...}

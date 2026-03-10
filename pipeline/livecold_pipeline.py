@@ -17,9 +17,9 @@ import os
 import paho.mqtt.client as mqtt
 
 from decision_engine.evaluator import evaluate_shipment, get_metrics_summary
-from anomaly_detector import detector as anomaly_detector
-from alert_notifier import notifier as alert_notifier
-from hub_manager import find_nearest_hubs
+from core.anomaly_detector import detector as anomaly_detector
+from core.alert_notifier import notifier as alert_notifier
+from core.hub_manager import find_nearest_hubs
 
 logging.basicConfig(
     level=logging.INFO,

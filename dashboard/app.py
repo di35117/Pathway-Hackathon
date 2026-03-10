@@ -15,8 +15,8 @@ import time
 import os
 import litellm
 from dotenv import load_dotenv
-from anomaly_detector import detector as anomaly_detector
-from alert_notifier import notifier as alert_notifier
+from core.anomaly_detector import detector as anomaly_detector
+from core.alert_notifier import notifier as alert_notifier
 
 load_dotenv()
 
@@ -488,7 +488,7 @@ def start_mqtt():
 # Hub management
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from hub_manager import get_all_hubs, find_nearest_hubs, update_hub_status, simulate_hub_dynamics
+from core.hub_manager import get_all_hubs, find_nearest_hubs, update_hub_status, simulate_hub_dynamics
 
 start_time = time.time()
 
