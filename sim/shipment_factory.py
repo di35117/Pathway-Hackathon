@@ -18,15 +18,15 @@ PRODUCT_PROFILES = [
     },
     {
         "name": "Frozen_Meat",
-        "safe_min": -20,
-        "safe_max": -10,
+        "safe_min": -18,
+        "safe_max": -15,
         "base_value": 1500000,
         "sensitivity": "MEDIUM"
     },
     {
         "name": "Dairy",
-        "safe_min": 2,
-        "safe_max": 6,
+        "safe_min": 1,
+        "safe_max": 4,
         "base_value": 800000,
         "sensitivity": "MEDIUM"
     },
