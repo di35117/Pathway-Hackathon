@@ -19,8 +19,11 @@
             font-family: 'Inter', system-ui, sans-serif;
             background: #060b14;
             color: #e0e6f0;
-            overflow: hidden;
+            /* FIX #3: removed overflow:hidden — let inner panels handle their own scroll.
+               height:100vh stays so the outer shell is viewport-tall. */
             height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ── Header ── */
@@ -32,6 +35,7 @@
             justify-content: space-between;
             border-bottom: 1px solid rgba(79, 195, 247, 0.1);
             z-index: 100;
+            flex-shrink: 0;
         }
 
         .header-left {
@@ -91,81 +95,31 @@
             gap: 16px;
         }
 
-        /* ── Eco Toggle ── */
-        .eco-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            cursor: pointer;
-            background: rgba(30, 48, 80, 0.5);
-            padding: 5px 12px;
-            border-radius: 20px;
-            border: 1px solid rgba(79, 195, 247, 0.1);
-            transition: all 0.3s;
-            user-select: none;
-        }
-
-        .eco-toggle:hover {
-            border-color: rgba(79, 195, 247, 0.3);
-        }
-
-        .eco-toggle.eco-on {
-            background: rgba(76, 175, 80, 0.15);
-            border-color: rgba(76, 175, 80, 0.3);
-        }
-
-        .eco-slider {
-            width: 32px;
-            height: 16px;
-            background: #1e3050;
-            border-radius: 8px;
-            position: relative;
-            transition: background 0.3s;
-        }
-
-        .eco-slider::after {
-            content: '';
-            width: 12px;
-            height: 12px;
-            background: #8899aa;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            transition: all 0.3s;
-        }
-
-        .eco-toggle.eco-on .eco-slider {
-            background: #2e7d32;
-        }
-
-        .eco-toggle.eco-on .eco-slider::after {
-            left: 18px;
-            background: #66bb6a;
-        }
-
         .clock {
             font-size: 12px;
             color: #6b7d94;
             font-variant-numeric: tabular-nums;
         }
 
-        /* ── Layout ── */
-        .main {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            grid-template-rows: auto 1fr;
-            height: calc(100vh - 48px);
+        /* ── Main wrapper — fills remaining height after header ── */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* clip overflow; children scroll internally */
+            min-height: 0;
+            /* needed for flex children to shrink */
         }
 
         /* ── Metrics Bar ── */
         .metrics-bar {
-            grid-column: 1 / -1;
             display: flex;
             gap: 0;
             background: linear-gradient(180deg, #0a1020, #080e1a);
             border-bottom: 1px solid rgba(79, 195, 247, 0.06);
+            flex-shrink: 0;
+            /* never squish the metric cards */
         }
 
         .metric-card {
@@ -208,7 +162,6 @@
             margin-top: 1px;
         }
 
-        /* Metric colors */
         .mc-blue .value {
             color: #4fc3f7;
         }
@@ -234,25 +187,26 @@
             color: #ba68c8;
         }
 
-        /* Animated glow for Cargo Saved */
         .mc-green {
             background: linear-gradient(180deg, rgba(76, 175, 80, 0.05), transparent);
         }
 
-        /* ── Prediction Banner ── */
+        /* ── Prediction Banner ──
+           FIX #1: Removed the duplicate display:flex that was overriding display:none.
+           Banner is hidden by default; JS toggles inline style. */
         .prediction-banner {
             display: none;
-            grid-column: 1 / -1;
+            /* ← only one display declaration now */
             padding: 6px 24px;
             background: linear-gradient(90deg, rgba(255, 183, 77, 0.1), rgba(255, 183, 77, 0.05));
             border-bottom: 1px solid rgba(255, 183, 77, 0.2);
             font-size: 12px;
             color: #ffb74d;
-            display: flex;
             align-items: center;
             gap: 8px;
             overflow-x: auto;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .prediction-banner .pred-item {
@@ -265,15 +219,28 @@
             font-size: 11px;
         }
 
-        /* ── Map ── */
-        .map-container {
-            position: relative;
+        /* ── Content Row — map + right panel, fills remaining height ──
+           FIX #2: replaced the broken 3-row grid with a proper flex layout.
+           The outer main-wrapper is a column flex; this content-row is the
+           flex:1 child, so it truly fills whatever height is left. */
+        .content-row {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            min-height: 0;
         }
 
+        /* ── Map ── */
+        .map-container {
+            flex: 1;
+            position: relative;
+            min-width: 0;
+        }
+
+        /* FIX #12: explicit height:100% so Leaflet always gets a real size */
         #map {
             width: 100%;
             height: 100%;
-            min-height: 400px;
         }
 
         .map-overlay {
@@ -296,13 +263,19 @@
             color: #8899aa;
         }
 
-        /* ── Right Panel ── */
+        /* ── Right Panel ──
+           FIX #4/#5: give the panel a bounded height so flex children scroll properly */
         .right-panel {
+            width: 380px;
+            flex-shrink: 0;
             background: #080e1a;
             border-left: 1px solid rgba(79, 195, 247, 0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            /* clip; children handle their own scroll */
+            height: 100%;
+            /* match the content-row height */
         }
 
         .panel-section {
@@ -320,6 +293,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .panel-header .count {
@@ -330,11 +304,22 @@
             font-size: 10px;
         }
 
-        /* ── Alerts ── */
+        /* ── Alerts ──
+           FIX #6: use flex-based proportion instead of fixed 45vh so it
+           doesn't overflow on short screens. */
+        .alerts-section {
+            display: flex;
+            flex-direction: column;
+            flex: 4;
+            /* takes ~40% of the right panel */
+            min-height: 0;
+            overflow: hidden;
+        }
+
         .alerts-list {
-            flex: 1;
             overflow-y: auto;
-            max-height: 45vh;
+            flex: 1;
+            min-height: 0;
         }
 
         .alert-item {
@@ -425,10 +410,20 @@
             font-weight: 500;
         }
 
-        /* ── Shipments ── */
+        /* ── Fleet ── */
+        .fleet-section {
+            display: flex;
+            flex-direction: column;
+            flex: 5;
+            /* takes ~50% of the right panel */
+            min-height: 0;
+            overflow: hidden;
+        }
+
         .shipment-list {
             overflow-y: auto;
             flex: 1;
+            min-height: 0;
         }
 
         .shipment-item {
@@ -436,7 +431,7 @@
             border-bottom: 1px solid rgba(20, 28, 46, 0.6);
             font-size: 12px;
             display: grid;
-            grid-template-columns: 60px 1fr 45px 45px 24px;
+            grid-template-columns: 60px 1fr 45px 45px 24px 24px;
             gap: 6px;
             align-items: center;
             cursor: pointer;
@@ -494,43 +489,20 @@
             opacity: 1;
         }
 
-        /* ── Scrollbar ── */
-        ::-webkit-scrollbar {
-            width: 4px;
+        /* ── Notifications ── */
+        .notif-section {
+            display: flex;
+            flex-direction: column;
+            flex: 2;
+            /* takes remaining ~20% */
+            min-height: 0;
+            overflow: hidden;
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #1e3050;
-            border-radius: 2px;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 900px) {
-            .main {
-                grid-template-columns: 1fr;
-            }
-
-            .right-panel {
-                display: none;
-            }
-
-            .metrics-bar {
-                flex-wrap: wrap;
-            }
-
-            .metric-card {
-                min-width: 33%;
-            }
-        }
-
-        /* ── Notifications Panel ── */
         .notif-list {
             overflow-y: auto;
-            max-height: 22vh;
+            flex: 1;
+            min-height: 0;
         }
 
         .notif-item {
@@ -601,10 +573,86 @@
             margin-top: 2px;
             display: inline-block;
         }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e3050;
+            border-radius: 2px;
+        }
+
+        /* ── SOP Sync Indicator ── */
+        .sop-sync-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(76, 175, 80, 0.10);
+            border: 1px solid rgba(76, 175, 80, 0.25);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #4caf50;
+            transition: all 0.4s ease;
+        }
+
+        .sop-sync-badge.updating {
+            background: rgba(255, 183, 77, 0.15);
+            border-color: rgba(255, 183, 77, 0.4);
+            color: #ffb74d;
+        }
+
+        .sop-sync-dot {
+            width: 6px;
+            height: 6px;
+            background: #4caf50;
+            border-radius: 50%;
+            transition: all 0.4s ease;
+        }
+
+        .sop-sync-badge.updating .sop-sync-dot {
+            background: #ffb74d;
+            animation: sopPulse 0.8s ease 3;
+        }
+
+        @keyframes sopPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 183, 77, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(255, 183, 77, 0);
+            }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .right-panel {
+                display: none;
+            }
+
+            .metrics-bar {
+                flex-wrap: wrap;
+            }
+
+            .metric-card {
+                min-width: 33%;
+            }
+        }
     </style>
 </head>
 
 <body>
+    <!-- ── Header ── -->
     <div class="header">
         <div class="header-left">
             <h1>🧊 LiveCold</h1>
@@ -613,8 +661,14 @@
             </div>
             <a href="/analytics" style="color:#4fc3f7;font-size:11px;text-decoration:none;margin-left:16px;opacity:0.7"
                 title="Business Analytics">📊 Analytics</a>
+            <a href="/sop-editor" style="color:#4fc3f7;font-size:11px;text-decoration:none;margin-left:8px;opacity:0.7"
+                title="SOP Editor & RAG Demo">📝 SOP Editor</a>
         </div>
         <div class="header-right">
+            <div class="sop-sync-badge" id="sopSyncBadge" title="SOP document sync status">
+                <div class="sop-sync-dot"></div>
+                <span id="sopSyncText">SOP synced</span>
+            </div>
             <div id="routingModeSummary"
                 style="display:flex;gap:8px;align-items:center;font-size:11px;background:rgba(255,255,255,0.05);padding:4px 12px;border-radius:20px">
                 <span style="color:#ff5252" title="SAFETY mode">🛡️ <b id="rm-safety">0</b></span>
@@ -626,7 +680,9 @@
         </div>
     </div>
 
-    <div class="main">
+    <!-- ── Main wrapper (header excluded) ── -->
+    <div class="main-wrapper">
+
         <!-- Metrics Bar -->
         <div class="metrics-bar">
             <div class="metric-card mc-blue">
@@ -667,60 +723,73 @@
             </div>
         </div>
 
-        <!-- Prediction Banner -->
+        <!-- Prediction Banner
+             FIX #1: display:none is the only declaration; JS uses style.display='flex' to show it -->
         <div class="prediction-banner" id="predictionBanner">
             <span>🔮 Predictions:</span>
             <div id="predictionList"></div>
         </div>
 
-        <!-- Map -->
-        <div class="map-container">
-            <div class="map-overlay">
-                <div class="map-chip" id="hubChip">🏭 15 Hubs</div>
-                <div class="map-chip" id="truckChip">🚚 0 Trucks</div>
-            </div>
-            <div id="map"></div>
-        </div>
+        <!-- Content Row: map + right panel -->
+        <div class="content-row">
 
-        <!-- Right Panel -->
-        <div class="right-panel">
-            <div class="panel-section">
-                <div class="panel-header">
-                    🚨 Alerts
-                    <span class="count" id="alert-count">0</span>
+            <!-- Map -->
+            <div class="map-container">
+                <div class="map-overlay">
+                    <div class="map-chip" id="hubChip">🏭 15 Hubs</div>
+                    <div class="map-chip" id="truckChip">🚚 0 Trucks</div>
                 </div>
-                <div class="alerts-list" id="alerts-list">
-                    <div class="alert-item" style="color:#4a5d73;text-align:center;padding:30px;">
-                        Waiting for alerts...
+                <div id="map"></div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+
+                <!-- Alerts section -->
+                <div class="alerts-section panel-section">
+                    <div class="panel-header">
+                        🚨 Alerts
+                        <span class="count" id="alert-count">0</span>
+                    </div>
+                    <div class="alerts-list" id="alerts-list">
+                        <div class="alert-item" style="color:#4a5d73;text-align:center;padding:30px;">
+                            Waiting for alerts...
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="panel-section" style="flex:1;display:flex;flex-direction:column;">
-                <div class="panel-header">
-                    🚚 Fleet
-                    <span class="count" id="fleet-count">0</span>
-                </div>
-                <div class="shipment-list" id="shipment-list">
-                    <div class="shipment-item"
-                        style="color:#4a5d73;grid-template-columns:1fr;text-align:center;padding:30px;">
-                        Waiting for data...
+
+                <!-- Fleet section -->
+                <div class="fleet-section panel-section">
+                    <div class="panel-header">
+                        🚚 Fleet
+                        <span class="count" id="fleet-count">0</span>
+                    </div>
+                    <div class="shipment-list" id="shipment-list">
+                        <div class="shipment-item"
+                            style="color:#4a5d73;grid-template-columns:1fr;text-align:center;padding:30px;">
+                            Waiting for data...
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="panel-section">
-                <div class="panel-header" style="cursor:pointer"
-                    onclick="document.getElementById('notif-list').style.display = document.getElementById('notif-list').style.display === 'none' ? 'block' : 'none'">
-                    📲 Notifications
-                    <span class="count" id="notif-count">0 ▾</span>
-                </div>
-                <div class="notif-list" id="notif-list">
-                    <div style="color:#4a5d73;text-align:center;padding:20px;font-size:11px">
-                        Waiting for notifications...
+
+                <!-- Notifications section -->
+                <div class="notif-section panel-section">
+                    <div class="panel-header" style="cursor:pointer" onclick="document.getElementById('notif-list').style.display =
+                                  document.getElementById('notif-list').style.display === 'none'
+                                  ? '' : 'none'">
+                        📲 Notifications
+                        <span class="count" id="notif-count">0 ▾</span>
+                    </div>
+                    <div class="notif-list" id="notif-list">
+                        <div style="color:#4a5d73;text-align:center;padding:20px;font-size:11px">
+                            Waiting for notifications...
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
+
+            </div><!-- /right-panel -->
+        </div><!-- /content-row -->
+    </div><!-- /main-wrapper -->
 
     <script>
         // ── Map Setup ──
@@ -731,15 +800,13 @@
 
         const markers = {};
         const hubMarkers = [];
-        let animatedSaved = 0;
 
         // ── Marker Icons ──
         function truckIcon(risk, action) {
             const color = action === 'DIVERT' ? '#ff5252' :
                 risk > 0.5 ? '#ffb74d' : '#66bb6a';
             const size = action === 'DIVERT' ? 18 : 14;
-            const pulse = action === 'DIVERT' ?
-                `animation: markerPulse 1.5s infinite;` : '';
+            const pulse = action === 'DIVERT' ? 'animation: markerPulse 1.5s infinite;' : '';
             return L.divIcon({
                 html: `<div style="
                     width:${size}px;height:${size}px;
@@ -755,17 +822,15 @@
             });
         }
 
-        // Add pulse animation
         const style = document.createElement('style');
         style.textContent = `
             @keyframes markerPulse {
                 0%, 100% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.6); opacity: 0.5; }
+                50%       { transform: scale(1.6); opacity: 0.5; }
             }
         `;
         document.head.appendChild(style);
 
-        // Hub icon
         function hubIconFn(status) {
             const color = status === 'available' ? '#2e7d32' : '#e65100';
             return L.divIcon({
@@ -795,7 +860,7 @@
                             <b style="font-size:14px">${h.name}</b><br>
                             <span style="color:${h.status === 'available' ? '#66bb6a' : '#ff5252'}">${h.status.toUpperCase()}</span><br>
                             <hr style="border-color:#333;margin:4px 0">
-                            🌡 Zones: <b>${(h.temp_zone_labels || []).join(', ') || h.accepts?.join(', ')}</b><br>
+                            🌡 Zones: <b>${(h.temp_zone_labels || []).join(', ') || (h.accepts || []).join(', ')}</b><br>
                             📦 Available: <b>${h.available_tonnes || Math.round(h.capacity_tonnes * (1 - h.occupied_pct / 100))}T</b> / ${h.capacity_tonnes}T<br>
                             📊 Occupancy: ${h.occupied_pct}%<br>
                             📞 ${h.contact || ''}
@@ -803,7 +868,7 @@
                     hubMarkers.push(m);
                 });
                 document.getElementById('hubChip').textContent = `🏭 ${hubs.length} Hubs`;
-            });
+            }).catch(() => { });
         }
 
         // ── Update Marker ──
@@ -876,7 +941,7 @@
             return Math.round(n).toLocaleString('en-IN');
         }
 
-        // ── Update Functions ──
+        // ── Metrics ──
         function updateMetrics() {
             fetch('/api/metrics').then(r => r.json()).then(m => {
                 document.getElementById('m-shipments').textContent = m.total_shipments || 0;
@@ -889,19 +954,19 @@
                 document.getElementById('event-count').textContent = (m.total_events || 0) + ' events';
                 document.getElementById('truckChip').textContent = `🚚 ${m.total_shipments || 0} Trucks`;
 
-                // Routing mode counts
                 if (m.routing_modes) {
                     document.getElementById('rm-safety').textContent = m.routing_modes.SAFETY || 0;
                     document.getElementById('rm-balanced').textContent = m.routing_modes.BALANCED || 0;
                     document.getElementById('rm-eco').textContent = m.routing_modes.ECO || 0;
                 }
-            });
+            }).catch(() => { });
         }
 
+        // ── Fleet ──
         function updateShipmentList() {
             fetch('/api/shipments').then(r => r.json()).then(ships => {
                 const list = document.getElementById('shipment-list');
-                if (ships.length === 0) return;
+                if (!ships.length) return;
                 document.getElementById('fleet-count').textContent = ships.length;
 
                 ships.sort((a, b) => {
@@ -922,41 +987,56 @@
                     const rm = s.routing_mode || 'BALANCED';
                     const rmIcon = rm === 'SAFETY' ? '🛡️' : rm === 'ECO' ? '🌱' : '⚖️';
                     const rmColor = rm === 'SAFETY' ? '#ff5252' : rm === 'ECO' ? '#66bb6a' : '#4fc3f7';
-                    return `<div class="shipment-item" onclick="map.setView([${s.lat || 22},${s.lon || 79}],8)">
+
+                    // FIX #9: use data-sid attribute; avoid raw string interpolation in onclick
+                    return `<div class="shipment-item" data-lat="${s.lat || 22}" data-lon="${s.lon || 79}">
                         <div class="sid">${s.shipment_id}</div>
                         <div class="route">${s.product_type}<br>${s.origin}→${s.destination}</div>
                         <div class="temp ${tc}">${temp}°</div>
                         <div class="risk" style="color:${rc}">${risk}%</div>
-                        <span onclick="event.stopPropagation();cycleRoutingMode('${s.shipment_id}')" 
-                              title="${rm}" 
+                        <span class="rm-toggle"
+                              data-sid="${s.shipment_id}"
+                              title="${rm}"
                               style="cursor:pointer;font-size:14px;padding:2px;border:1px solid ${rmColor};border-radius:6px;line-height:1"
                               id="rm-${s.shipment_id}">${rmIcon}</span>
-                        <a class="driver-link" href="/driver/${s.shipment_id}" target="_blank" onclick="event.stopPropagation()" title="Driver View">📱</a>
+                        <a class="driver-link" href="/driver/${s.shipment_id}" target="_blank" title="Driver View">📱</a>
                     </div>`;
                 }).join('');
 
+                // Attach row click (pan map) and routing-mode toggle safely
+                list.querySelectorAll('.shipment-item').forEach(row => {
+                    row.addEventListener('click', () => {
+                        map.setView([parseFloat(row.dataset.lat), parseFloat(row.dataset.lon)], 8);
+                    });
+                });
+                list.querySelectorAll('.rm-toggle').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        cycleRoutingMode(btn.dataset.sid);
+                    });
+                });
+
                 ships.forEach(updateMarker);
-            });
+            }).catch(() => { });
         }
 
+        // ── Alerts ──
         function updateAlerts() {
             fetch('/api/alerts').then(r => r.json()).then(alertList => {
                 const list = document.getElementById('alerts-list');
-                if (alertList.length === 0) return;
+                if (!alertList.length) return;
                 document.getElementById('alert-count').textContent = alertList.length;
 
-                alertList.reverse();
-                list.innerHTML = alertList.slice(0, 30).map((a, i) => {
+                const recent = [...alertList].reverse().slice(0, 30);
+                list.innerHTML = recent.map(a => {
                     const isDivert = a.action === 'DIVERT';
                     const isDoor = a.action && a.action.includes('DOOR');
-                    const cls = isDivert ? 'divert' : (isDoor ? 'door' : '');
-                    const badgeCls = isDivert ? 'divert' : (isDoor ? 'door' : 'continue');
+                    const cls = isDivert ? 'divert' : isDoor ? 'door' : '';
+                    const badgeCls = isDivert ? 'divert' : isDoor ? 'door' : 'continue';
                     const time = a.timestamp ? a.timestamp.split('T')[1]?.substring(0, 8) : '';
                     const hasSOP = a.sop_recommendation && a.sop_recommendation.length > 10;
                     const sop = hasSOP ? `
-                        <div class="sop-toggle" onclick="this.parentElement.classList.toggle('expanded')">
-                            📋 ${a.sop_recommendation ? 'View SOP Recommendation ▾' : ''}
-                        </div>
+                        <div class="sop-toggle">📋 View SOP Recommendation ▾</div>
                         <div class="sop-rec">${a.sop_recommendation}</div>
                     ` : '';
                     return `<div class="alert-item ${cls}">
@@ -970,31 +1050,50 @@
                         ${sop}
                     </div>`;
                 }).join('');
-            });
+
+                // FIX #9: attach SOP toggle via JS instead of inline onclick
+                list.querySelectorAll('.sop-toggle').forEach(btn => {
+                    btn.addEventListener('click', () => btn.parentElement.classList.toggle('expanded'));
+                });
+            }).catch(() => { });
         }
 
         // ── Predictions ──
-        function updatePredictions() {
-            fetch('/api/shipments').then(r => r.json()).then(async ships => {
+        // FIX #8: fetch all histories in parallel with Promise.all instead of sequential await
+        async function updatePredictions() {
+            try {
+                const ships = await fetch('/api/shipments').then(r => r.json());
+                const subset = ships.slice(0, 10);
+
+                const results = await Promise.all(
+                    subset.map(s =>
+                        fetch(`/api/history/${s.shipment_id}`)
+                            .then(r => r.json())
+                            .then(data => ({ s, data }))
+                            .catch(() => null)
+                    )
+                );
+
                 const predictions = [];
-                for (const s of ships.slice(0, 10)) {
-                    try {
-                        const resp = await fetch(`/api/history/${s.shipment_id}`);
-                        const data = await resp.json();
-                        if (data.prediction && data.prediction.trend === 'rising' &&
-                            data.prediction.predicted_temp_30min > s.safe_max_temp) {
-                            predictions.push({
-                                id: s.shipment_id,
-                                current: data.prediction.current_temp,
-                                predicted: data.prediction.predicted_temp_30min,
-                                threshold: s.safe_max_temp,
-                            });
-                        }
-                    } catch (e) { }
-                }
+                results.forEach(res => {
+                    if (!res) return;
+                    const { s, data } = res;
+                    if (data.prediction &&
+                        data.prediction.trend === 'rising' &&
+                        data.prediction.predicted_temp_30min > s.safe_max_temp) {
+                        predictions.push({
+                            id: s.shipment_id,
+                            current: data.prediction.current_temp,
+                            predicted: data.prediction.predicted_temp_30min,
+                            threshold: s.safe_max_temp,
+                        });
+                    }
+                });
+
                 const banner = document.getElementById('predictionBanner');
                 const plist = document.getElementById('predictionList');
                 if (predictions.length > 0) {
+                    // FIX #1: set display to 'flex' (the correct value for this flex container)
                     banner.style.display = 'flex';
                     plist.innerHTML = predictions.map(p =>
                         `<span class="pred-item">⚠️ ${p.id}: ${p.current}°C → ${p.predicted}°C in 30min (limit: ${p.threshold}°C)</span>`
@@ -1002,92 +1101,137 @@
                 } else {
                     banner.style.display = 'none';
                 }
-            });
+            } catch (e) { }
         }
 
         // ── Per-Shipment Routing Mode ──
         function cycleRoutingMode(shipmentId) {
             const modes = ['SAFETY', 'BALANCED', 'ECO'];
-            const icons = { 'SAFETY': '🛡️', 'BALANCED': '⚖️', 'ECO': '🌱' };
+            const icons = { SAFETY: '🛡️', BALANCED: '⚖️', ECO: '🌱' };
             const el = document.getElementById('rm-' + shipmentId);
-            const current = el?.title || 'BALANCED';
+            if (!el) return;
+            const current = el.title || 'BALANCED';
             const next = modes[(modes.indexOf(current) + 1) % 3];
             fetch(`/api/routing-mode/${shipmentId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mode: next })
-            }).then(r => r.json()).then(d => {
-                if (el) { el.textContent = icons[next]; el.title = next; }
-            });
+            }).then(r => r.json()).then(() => {
+                el.textContent = icons[next];
+                el.title = next;
+            }).catch(() => { });
         }
 
         // ── Clock ──
         function updateClock() {
-            const now = new Date();
             document.getElementById('clock').textContent =
-                now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
         // ── SSE ──
-        const evtSource = new EventSource('/api/stream');
-        evtSource.onmessage = function (e) {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'update') updateMarker(msg.data);
-        };
+        // FIX #7: added onerror handler with exponential back-off reconnect
+        let sseRetryDelay = 2000;
+        function connectSSE() {
+            const evtSource = new EventSource('/api/stream');
+            evtSource.onmessage = e => {
+                sseRetryDelay = 2000; // reset on success
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'update') updateMarker(msg.data);
+                    if (msg.type === 'sop_update') {
+                        // Instant flash when SOP changes
+                        const badge = document.getElementById('sopSyncBadge');
+                        badge.classList.add('updating');
+                        document.getElementById('sopSyncText').textContent = 'SOP updating...';
+                        setTimeout(() => {
+                            badge.classList.remove('updating');
+                            document.getElementById('sopSyncText').textContent = 'SOP synced just now';
+                        }, 3000);
+                    }
+                } catch (_) { }
+            };
+            evtSource.onerror = () => {
+                console.warn(`SSE disconnected — retrying in ${sseRetryDelay / 1000}s`);
+                evtSource.close();
+                setTimeout(() => {
+                    sseRetryDelay = Math.min(sseRetryDelay * 2, 30000);
+                    connectSSE();
+                }, sseRetryDelay);
+            };
+        }
+        connectSSE();
 
-        // ── Notifications Panel ──
+        // ── Notifications ──
         function updateNotifications() {
             fetch('/api/notifications').then(r => r.json()).then(notifs => {
                 const list = document.getElementById('notif-list');
-                if (!notifs || notifs.length === 0) return;
-                document.getElementById('notif-count').textContent = notifs.length;
+                if (!notifs || !notifs.length) return;
 
-                const reversed = [...notifs].reverse();
-                list.innerHTML = reversed.slice(0, 30).map((n, i) => {
+                // Deduplicate: keep only latest notification per shipment_id + type
+                const seen = new Map();
+                [...notifs].reverse().forEach(n => {
+                    const key = `${n.shipment_id}_${n.type}`;
+                    if (!seen.has(key)) seen.set(key, n);
+                });
+                const deduped = [...seen.values()];
+                document.getElementById('notif-count').textContent = deduped.length;
+
+                list.innerHTML = deduped.slice(0, 30).map((n, i) => {
                     const isWA = n.channel === 'whatsapp';
                     const isDivert = n.type === 'DIVERT_WHATSAPP';
                     const isRepair = n.type === 'REPAIR_WHATSAPP';
                     const isDelivery = n.type === 'DELIVERY_EMAIL';
-
                     const cls = isDivert ? 'divert-wa' : isRepair ? 'repair-wa' : 'delivery-em';
                     const channelCls = isWA ? 'wa' : 'email';
-                    const channelLabel = isWA ? '📱 WhatsApp' : '📧 Email';
                     const icon = isDivert ? '🚨' : isRepair ? '🔧' : '✅';
                     const label = isDivert ? 'DIVERT' : isRepair ? 'REPAIR' : 'DELIVERED';
                     const recipient = n.recipient || '';
                     const time = n.timestamp ? n.timestamp.split('T')[1]?.substring(0, 8) : '';
-                    const sent = n.sent_to_driver ? true : false;
+                    const sent = !!n.sent_to_driver;
                     const sendLabel = isDelivery ? 'Send Email' : 'Send WhatsApp';
                     const sendBtnId = `send-btn-${i}`;
-
                     const preview = (n.message || '').split('\n')[0].substring(0, 50);
 
                     return `<div class="notif-item ${cls}" id="notif-${i}">
                         <div class="notif-top">
                             <span style="font-weight:700;color:#e0e6f0">${icon} ${n.shipment_id} — ${label}</span>
-                            <span class="notif-channel ${channelCls}">${channelLabel}</span>
+                            <span class="notif-channel ${channelCls}">${isWA ? '📱 WhatsApp' : '📧 Email'}</span>
                         </div>
                         <div style="color:#5a6f85;font-size:10px;margin-bottom:4px">
                             To: ${recipient} · ${time}
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
-                            <button id="${sendBtnId}" 
-                                onclick="sendNotification('${n.shipment_id}', '${n.type}', '${sendBtnId}')"
-                                style="background:${sent ? '#1e3050' : (isDelivery ? '#4fc3f7' : '#25D366')};
-                                       color:${sent ? '#5a6f85' : '#fff'};
-                                       border:none;border-radius:6px;padding:4px 10px;font-size:10px;
-                                       font-weight:700;cursor:${sent ? 'default' : 'pointer'};
-                                       transition:all 0.3s"
-                                ${sent ? 'disabled' : ''}>
+                            <button id="${sendBtnId}"
+                                    data-sid="${n.shipment_id}"
+                                    data-type="${n.type}"
+                                    class="send-notif-btn"
+                                    style="background:${sent ? '#1e3050' : (isDelivery ? '#4fc3f7' : '#25D366')};
+                                           color:${sent ? '#5a6f85' : '#fff'};
+                                           border:none;border-radius:6px;padding:4px 10px;font-size:10px;
+                                           font-weight:700;cursor:${sent ? 'default' : 'pointer'};transition:all 0.3s"
+                                    ${sent ? 'disabled' : ''}>
                                 ${sent ? '✓ Sent' : sendLabel + ' ▶'}
                             </button>
-                            <span class="notif-expand" onclick="document.getElementById('notif-${i}').classList.toggle('expanded')">
+                            <span class="notif-expand" data-target="notif-${i}">
                                 ${preview}... ▾
                             </span>
                         </div>
                         <div class="notif-msg">${(n.message || '').replace(/</g, '&lt;')}</div>
                     </div>`;
                 }).join('');
+
+                // FIX #9: event delegation for send + expand — no inline onclick strings
+                list.querySelectorAll('.send-notif-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (btn.disabled) return;
+                        sendNotification(btn.dataset.sid, btn.dataset.type, btn.id);
+                    });
+                });
+                list.querySelectorAll('.notif-expand').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.getElementById(btn.dataset.target)?.classList.toggle('expanded');
+                    });
+                });
             }).catch(() => { });
         }
 
@@ -1103,7 +1247,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ shipment_id: shipmentId, type: notifType })
-            }).then(r => r.json()).then(d => {
+            }).then(r => r.json()).then(() => {
                 btn.textContent = '✓ Sent to Driver';
                 btn.style.color = '#66bb6a';
             }).catch(() => {
@@ -1130,6 +1274,29 @@
         updateClock();
         loadHubs();
         setTimeout(updatePredictions, 8000);
+
+        // ── SOP Sync Status ──
+        let lastSopChangeCount = 0;
+        function updateSopStatus() {
+            fetch('/api/sop-status').then(r => r.json()).then(data => {
+                const badge = document.getElementById('sopSyncBadge');
+                const text = document.getElementById('sopSyncText');
+                const ago = data.synced_seconds_ago;
+                const agoStr = ago < 5 ? 'just now' : ago < 60 ? ago + 's ago' : Math.floor(ago / 60) + 'm ago';
+
+                if (data.change_count > lastSopChangeCount && lastSopChangeCount > 0) {
+                    // New change detected!
+                    badge.classList.add('updating');
+                    text.textContent = 'SOP updated! ' + agoStr;
+                    setTimeout(() => badge.classList.remove('updating'), 3000);
+                } else {
+                    text.textContent = 'SOP synced ' + agoStr;
+                }
+                lastSopChangeCount = data.change_count;
+            }).catch(() => { });
+        }
+        updateSopStatus();
+        setInterval(updateSopStatus, 3000);
     </script>
 </body>
 

@@ -8,6 +8,7 @@ GPS_TOPIC = "livecold/gps"
 TEMP_TOPIC = "livecold/temp"
 REEFER_TOPIC = "livecold/reefer"
 DOOR_TOPIC = "livecold/door"
+DIVERT_TOPIC = "livecold/divert"
 
 SIMULATION_INTERVAL = 2  # seconds between updates
 
