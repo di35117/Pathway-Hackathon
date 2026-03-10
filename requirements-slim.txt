@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 # Requirements for LiveCold (Pathway + Demo)
 flask
 paho-mqtt
