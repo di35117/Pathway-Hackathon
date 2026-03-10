@@ -57,6 +57,9 @@ def main():
         for shipment in shipments:
             sid = shipment["shipment_id"]
 
+            if shipment.get("arrived"):
+                continue
+
             # Check if this shipment is diverted
             with diversion_lock:
                 diversion = active_diversions.get(sid)
@@ -71,12 +74,20 @@ def main():
                 dist = ((shipment["current_lat"] - target_lat)**2 +
                         (shipment["current_lon"] - target_lon)**2) ** 0.5
                 if dist < 0.01:  # ~1km
-                    print(f"✅ {sid} ARRIVED at {dest_name}")
-                    with diversion_lock:
-                        del active_diversions[sid]
-                    # Reset to continue original route
-                    shipment["eta_minutes_remaining"] = 30
-                    continue
+                    if not shipment.get("arrived_log_printed"):
+                        print(f"✅ {sid} ARRIVED at {dest_name}")
+                        shipment["arrived_log_printed"] = True
+                    shipment["eta_minutes_remaining"] = 0
+                    shipment["speed_kmph"] = 0
+                    shipment["arrived"] = True
+                    
+                    # Make sure the final position is exactly the hub
+                    shipment["current_lat"] = target_lat
+                    shipment["current_lon"] = target_lon
+                    
+                    # Do NOT delete from active_diversions so pipeline knows it's still diverted
+                    # Do NOT reset ETA to 30 minutes
+                    pass
             else:
                 # Normal: move toward original destination
                 target_lat = shipment["end_lat"]
