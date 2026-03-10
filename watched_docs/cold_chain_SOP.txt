@@ -9,7 +9,7 @@
 
 All refrigerated cargo must be maintained within specified temperature ranges:
 
-- **Dairy Products**: +2°C to +8°C
+- **Dairy Products**: +2°C to +10°C
 - **Frozen Meat**: -18°C to -12°C
 - **Seafood**: -1°C to +2°C
 - **Fresh Vegetables**: +7°C to +10°C

@@ -43,7 +43,7 @@ LiveCold is an **end-to-end cold chain intelligence platform** that goes beyond 
 | 💰 **Cost-Benefit Diversion** | Compares `expected cargo loss` vs `diversion cost` — only diverts when economically rational |
 | 🏭 **Intelligent Hub Matching** | 15 Indian hubs filtered by temp-zone compatibility, capacity, and traffic-aware ETA |
 | 🔀 **Live GPS Re-Routing** | Diverted trucks physically change course on the map toward the assigned hub |
-| 📲 **3-Channel Notifications** | WhatsApp (DIVERT + Repair alerts) and Email (delivery compliance reports) |
+| 📲 **Interactive Notifications** | Drivers receive diversion proposals and must ACCEPT before GPS re-routing |
 | 📄 **Pathway RAG Pipeline** | Edit the SOP → AI learns it in 2 seconds → answers cite updated §sections |
 | 🌿 **Carbon Credits Engine** | Calculates CO₂ saved from prevented food waste, converts to ₹ credits |
 | ⚖️ **Per-Shipment Routing Modes** | SAFETY / BALANCED / ECO — configurable mid-journey with bidirectional MQTT sync |
@@ -198,7 +198,7 @@ Total Divert Cost        = Fuel + Residual Risk × Value  = ₹1,596
 - 🚗 Best traffic-aware ETA (congestion zones for Delhi, Mumbai, Bangalore...)
 - 🔧 Repair station capability (for anomaly-triggered alerts)
 
-**6. Action** — Driver gets a WhatsApp notification with hub name, Google Maps link, ETA, and contact number. GPS simulator re-routes the truck. Dashboard updates live.
+**6. Action & Driver Acceptance** — Driver gets a dashboard notification with the proposed hub, Google Maps link, and ETA. The truck only diverts *after* the driver clicks **Accept** on their interactive mobile dashboard. The main dashboard updates live.
 
 ---
 
@@ -364,13 +364,13 @@ hack/
 ├── pathway_metrics_pipeline.py     # 📊 Pathway metrics aggregation
 ├── pathway_integrated_full.py      # 🔗 Full integrated Pathway pipeline
 │
-├── dashboard/
-│   ├── app.py                      # 🌐 Flask server (1061 lines, 20+ routes)
-│   └── templates/
-│       ├── index_1.html            # Main dashboard (map + alerts + metrics)
-│       ├── driver.html             # 📱 Mobile driver dashboard
-│       ├── analytics.html          # 📈 Carbon credits + anomaly analytics
-│       └── sop_editor.html         # 📄 Live SOP editor + RAG tester
+│   ├── dashboard/
+│   │   ├── app.py                      # 🌐 Flask server (1061 lines, 20+ routes)
+│   │   └── templates/
+│   │       ├── index_1.html            # Main dashboard (map + alerts + metrics)
+│   │       ├── driver_1.html           # 📱 Interactive mobile driver dashboard
+│   │       ├── analytics_1.html        # 📈 Carbon credits + anomaly analytics
+│   │       └── sop_editor_1.html       # 📄 Live SOP editor + RAG tester
 │
 ├── watched_docs/
 │   └── cold_chain_SOP.txt          # 📋 SOP document (10 sections, 399 lines)

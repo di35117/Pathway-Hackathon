@@ -167,7 +167,7 @@ HUBS = [
     {"id": "HUB_12", "name": "IceBank - Indore",               "lat": 22.7200, "lon": 75.8600, "capacity_tonnes": 300,  "occupied_pct": 50, "temp_zones": ["chilled", "cool"],                  "status": "available", "contact": "+91-9876543212", "has_repair": False},
     {"id": "HUB_13", "name": "GlacierPack - Chandigarh",       "lat": 30.7300, "lon": 76.7800, "capacity_tonnes": 350,  "occupied_pct": 48, "temp_zones": ["chilled", "frozen", "deep_frozen"], "status": "available", "contact": "+91-9876543213", "has_repair": True},
     {"id": "HUB_14", "name": "CoolStore - Kochi",              "lat": 9.9300,  "lon": 76.2700, "capacity_tonnes": 400,  "occupied_pct": 60, "temp_zones": ["chilled", "frozen", "cool"],        "status": "available", "contact": "+91-9876543214", "has_repair": True},
-    {"id": "HUB_15", "name": "FrostGuard - Guwahati",          "lat": 26.1500, "lon": 91.7400, "capacity_tonnes": 200,  "occupied_pct": 25, "temp_zones": ["chilled", "frozen"],                "status": "available", "contact": "+91-9876543215", "has_repair": False},
+    {"id": "HUB_15", "name": "FrostGuard - Guwahati",          "lat": 26.1500, "lon": 91.7400, "capacity_tonnes": 500,  "occupied_pct": 25, "temp_zones": ["chilled", "frozen", "deep_frozen", "cool", "ambient"], "status": "available", "contact": "+91-9876543215", "has_repair": True},
 ]
 
 _hub_state = [dict(h) for h in HUBS]

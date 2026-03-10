@@ -357,8 +357,8 @@ def on_message(client, userdata, msg):
                 "sop_recommendation": "Consulting SOP..."
             }
 
-            # Find nearest hub and publish diversion order
-            if s.get("lat") and s.get("lon"):
+            # Find nearest hub and prepare diversion order (but don't publish yet)
+            if s.get("lat") and s.get("lon") and not s.get("divert_proposed"):
                 cargo = s.get("product_type", "dairy").lower().replace(" ", "_")
                 hubs = find_nearest_hubs(
                     s["lat"], s["lon"],
@@ -374,25 +374,36 @@ def on_message(client, userdata, msg):
                         "hub_id": best_hub["id"],
                         "distance_km": best_hub["distance_km"],
                         "eta_minutes": best_hub["eta_minutes"],
+                        "expected_loss_inr": data.get("expected_loss_inr", 0),
+                        "diversion_cost_inr": data.get("diversion_cost_inr", 0),
+                        "co2_delta_kg": data.get("co2_delta_kg", best_hub["distance_km"] * 0.9)
                     }
-                    mqtt_client and mqtt_client.publish(
-                        "livecold/divert",
-                        json.dumps(divert_order)
-                    )
-                    s["divert_hub"] = best_hub["name"]
-                    s["divert_distance_km"] = best_hub["distance_km"]
-                    alert["divert_hub"] = best_hub["name"]
+                    
+                    # Store as pending instead of taking immediate action
+                    s["pending_divert_order"] = divert_order
+                    s["divert_proposed"] = True
+                    alert["divert_hub"] = "Proposed: " + best_hub["name"]
                     alert["divert_distance"] = best_hub["distance_km"]
-                    # Only count each shipment's diversion ONCE
-                    if shipment_id not in diverted_shipments_saved:
-                        metrics["total_diversions"] += 1
-                        # Cargo saved = expected_loss - diversion_cost (from pipeline)
-                        exp_loss = data.get("expected_loss_inr", 0)
-                        div_cost = data.get("diversion_cost_inr", 0)
-                        saved = max(0, int(exp_loss - div_cost))
-                        diverted_shipments_saved[shipment_id] = saved
-                        metrics["total_value_saved"] += saved
-                        metrics["total_co2_delta"] += data.get("co2_delta_kg", best_hub["distance_km"] * 0.9)
+                    
+                    # Automatically push notification to driver to ask for acceptance
+                    divert_msg = {
+                        "type": "DIVERT_PROPOSED",
+                        "shipment_id": shipment_id,
+                        "message": f"🚨 DIVERSION PROPOSED\nHigh risk detected.\nRoute to {best_hub['name']} ({best_hub['distance_km']}km away).\nPlease accept this diversion.",
+                        "channel": "dashboard",
+                        "timestamp": datetime.now().isoformat(),
+                        "sent_to_driver": True
+                    }
+                    
+                    if shipment_id not in driver_notifications:
+                        driver_notifications[shipment_id] = []
+                    driver_notifications[shipment_id].append(divert_msg)
+                    
+                    try:
+                        mqtt_client and mqtt_client.publish(f"livecold/driver-notifications/{shipment_id}", json.dumps(divert_msg))
+                    except Exception:
+                        pass
+                    log.info(f"⏳ Diversion proposed for {shipment_id} to {best_hub['name']}. Waiting for driver acceptance.")
 
             # Fetch RAG recommendation in background thread
             def fetch_sop(alert_ref, at, pt, sid, t):
@@ -490,7 +501,7 @@ def index():
 @app.route("/driver/<shipment_id>")
 def driver_view(shipment_id):
     """Driver dashboard — mobile-friendly view for a single shipment."""
-    return render_template("driver.html", shipment_id=shipment_id)
+    return render_template("driver_1.html", shipment_id=shipment_id)
 
 
 @app.route("/api/shipments")
@@ -600,6 +611,48 @@ def api_history(shipment_id):
         "prediction": prediction,
     })
 
+
+@app.route("/api/accept-diversion/<shipment_id>", methods=["POST"])
+def api_accept_diversion(shipment_id):
+    """Confirm a proposed diversion and officially send the redirect order."""
+    s = shipments.get(shipment_id)
+    if not s:
+        return jsonify({"error": "Shipment not found"}), 404
+        
+    divert_order = s.get("pending_divert_order")
+    if not divert_order:
+        return jsonify({"error": "No pending diversion found"}), 400
+
+    # Publish to MQTT to actually move the truck
+    mqtt_client and mqtt_client.publish(
+        "livecold/divert",
+        json.dumps(divert_order)
+    )
+    
+    # Commit changes and metrics
+    s["divert_hub"] = divert_order["hub_name"]
+    s["divert_distance_km"] = divert_order["distance_km"]
+    s["divert_accepted"] = True
+    
+    # Only count each shipment's diversion ONCE
+    if shipment_id not in diverted_shipments_saved:
+        metrics["total_diversions"] += 1
+        
+        # Calculate saved value from stored order
+        exp_loss = divert_order.get("expected_loss_inr", 0)
+        div_cost = divert_order.get("diversion_cost_inr", 0)
+        saved = max(0, int(exp_loss - div_cost))
+        
+        diverted_shipments_saved[shipment_id] = saved
+        metrics["total_value_saved"] += saved
+        metrics["total_co2_delta"] += divert_order.get("co2_delta_kg", divert_order["distance_km"] * 0.9)
+        
+    log.info(f"✅ Diversion ACCEPTED by driver for {shipment_id}. Truck redirecting to {divert_order['hub_name']}.")
+    
+    # Remove pending status
+    s.pop("pending_divert_order", None)
+    
+    return jsonify({"status": "accepted", "shipment_id": shipment_id, "hub": divert_order["hub_name"]})
 
 @app.route("/api/hubs")
 def api_hubs():
@@ -758,7 +811,7 @@ CARBON_CREDIT_RATE_INR = 1000  # ₹ per tonne CO₂
 
 @app.route("/analytics")
 def analytics_page():
-    return render_template("analytics.html")
+    return render_template("analytics_1.html")
 
 
 @app.route("/api/analytics")
@@ -888,7 +941,7 @@ def api_shipment_report(shipment_id):
 @app.route("/sop-editor")
 def sop_editor_page():
     """SOP Editor — live edit SOP documents and test RAG answers."""
-    return render_template("sop_editor.html")
+    return render_template("sop_editor_1.html")
 
 
 @app.route("/api/sop-content", methods=["GET"])
