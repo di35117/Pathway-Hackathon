@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LiveCold Driver - {{ shipment_id }}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0e17;
+            color: #e0e6f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #0d1526, #162040);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e3050;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4fc3f7, #81d4fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .shipment-badge {
+            background: #1e3a5f;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4fc3f7;
+        }
+
+        /* ── Status Bar ── */
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 8px 12px;
+            background: #0d1526;
+        }
+
+        .stat-card {
+            background: rgba(30, 48, 80, 0.6);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid rgba(79, 195, 247, 0.1);
+        }
+
+        .stat-card .label {
+            font-size: 10px;
+            color: #8899aa;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .stat-card.temp .value {
+            color: #4caf50;
+        }
+
+        .stat-card.temp.danger .value {
+            color: #ff5252;
+        }
+
+        .stat-card.risk .value {
+            color: #ffc107;
+        }
+
+        .stat-card.risk.high .value {
+            color: #ff5252;
+        }
+
+        .stat-card.speed .value {
+            color: #4fc3f7;
+        }
+
+        /* ── Map ── */
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+
+        /* ── Hub Panel ── */
+        .hub-panel {
+            background: #0d1526;
+            padding: 12px;
+            border-top: 1px solid #1e3050;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .hub-panel h3 {
+            font-size: 13px;
+            color: #4fc3f7;
+            margin-bottom: 8px;
+        }
+
+        .hub-card {
+            background: rgba(30, 48, 80, 0.5);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(79, 195, 247, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hub-card.recommended {
+            border-color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .hub-info h4 {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .hub-info .details {
+            font-size: 11px;
+            color: #8899aa;
+            margin-top: 2px;
+        }
+
+        .hub-metrics {
+            text-align: right;
+        }
+
+        .hub-metrics .distance {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4fc3f7;
+        }
+
+        .hub-metrics .eta {
+            font-size: 11px;
+            color: #8899aa;
+        }
+
+        .hub-metrics .cost {
+            font-size: 11px;
+            color: #ffc107;
+        }
+
+        .navigate-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .navigate-btn:active {
+            transform: scale(0.98);
+        }
+
+        .action-banner {
+            padding: 10px 16px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 14px;
+            display: none;
+        }
+
+        .action-banner.divert {
+            display: block;
+            background: linear-gradient(135deg, #b71c1c, #d32f2f);
+            color: white;
+            animation: pulseBanner 2s infinite;
+        }
+
+        .action-banner.safe {
+            display: block;
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: white;
+        }
+
+        @keyframes pulseBanner {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .occupancy-bar {
+            height: 4px;
+            background: #1e3050;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .occupancy-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s;
+        }
+
+        /* ── Driver Notifications ── */
+        .driver-notif-panel {
+            background: #0d1526;
+            border-top: 1px solid #1e3050;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .driver-notif-panel h3 {
+            font-size: 13px;
+            color: #ff9800;
+            padding: 8px 12px 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .driver-notif-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(30, 48, 80, 0.6);
+            font-size: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .driver-notif-item.divert {
+            border-left: 3px solid #ff5252;
+            background: rgba(255, 82, 82, 0.05);
+        }
+
+        .driver-notif-item.repair {
+            border-left: 3px solid #ff9800;
+            background: rgba(255, 152, 0, 0.05);
+        }
+
+        .driver-notif-item.delivery {
+            border-left: 3px solid #66bb6a;
+            background: rgba(102, 187, 106, 0.05);
+        }
+
+        .driver-notif-msg {
+            white-space: pre-line;
+            color: #8899aa;
+            font-size: 11px;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+
+        .routing-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .routing-badge.safety {
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff5252;
+        }
+
+        .routing-badge.balanced {
+            background: rgba(79, 195, 247, 0.2);
+            color: #4fc3f7;
+        }
+
+        .routing-badge.eco {
+            background: rgba(102, 187, 106, 0.2);
+            color: #66bb6a;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🧊 LiveCold Driver</h1>
+        <div class="shipment-badge">{{ shipment_id }}</div>
+    </div>
+
+    <div class="action-banner" id="actionBanner"></div>
+
+    <div class="status-bar">
+        <div class="stat-card temp" id="tempCard">
+            <div class="label">Temperature</div>
+            <div class="value" id="tempValue">--°C</div>
+        </div>
+        <div class="stat-card risk" id="riskCard">
+            <div class="label">Risk</div>
+            <div class="value" id="riskValue">--%</div>
+        </div>
+        <div class="stat-card speed">
+            <div class="label">Speed</div>
+            <div class="value" id="speedValue">-- km/h</div>
+        </div>
+    </div>
+
+    <div
+        style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0d1526;border-bottom:1px solid #1e3050">
+        <span style="font-size:11px;color:#8899aa">🗺️ Route: <b id="routeInfo">Loading...</b></span>
+        <span class="routing-badge balanced" id="routingModeBadge">⚖️ BALANCED</span>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="driver-notif-panel" id="driverNotifPanel">
+        <h3>📲 Messages <span id="driverNotifCount" style="font-size:11px;color:#4fc3f7">0</span></h3>
+        <div id="driverNotifList" style="font-size:11px;color:#5a6f85;text-align:center;padding:10px">
+            No messages yet
+        </div>
+    </div>
+
+    <div class="hub-panel" id="hubPanel">
+        <h3>📦 Nearest Cold Storage Hubs</h3>
+        <div id="hubList">Loading hubs...</div>
+    </div>
+
+    <script>
+        const SHIPMENT_ID = "{{ shipment_id }}";
+        let map, truckMarker, hubMarkers = [], routeLine = null;
+
+        // ── Initialize map ──
+        map = L.map('map').setView([22.5, 78.9], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Custom truck icon
+        const truckIcon = L.divIcon({
+            html: '<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">🚚</div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            className: ''
+        });
+
+        // Hub icon
+        function hubIcon(status) {
+            const color = status === 'available' ? '#4caf50' : '#ff9800';
+            return L.divIcon({
+                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))">🏭</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                className: ''
+            });
+        }
+
+        // ── Fetch shipment data ──
+        async function updateShipment() {
+            try {
+                const resp = await fetch('/api/shipments');
+                const shipments = await resp.json();
+                const s = shipments.find(sh => sh.shipment_id === SHIPMENT_ID);
+                if (!s) return;
+
+                // Update stats
+                const temp = s.temp;
+                const risk = s.risk_probability;
+                const speed = s.speed_kmph || 0;
+
+                document.getElementById('tempValue').textContent = temp != null ? temp.toFixed(1) + '°C' : '--°C';
+                document.getElementById('riskValue').textContent = (risk * 100).toFixed(0) + '%';
+                document.getElementById('speedValue').textContent = speed.toFixed(0) + ' km/h';
+
+                // Color coding
+                const tempCard = document.getElementById('tempCard');
+                const riskCard = document.getElementById('riskCard');
+                tempCard.classList.toggle('danger', temp > s.safe_max_temp || temp < s.safe_min_temp);
+                riskCard.classList.toggle('high', risk > 0.6);
+
+                // Action banner
+                const banner = document.getElementById('actionBanner');
+                if (s.recommended_action === 'DIVERT') {
+                    banner.className = 'action-banner divert';
+                    banner.textContent = '🚨 DIVERT — Route to nearest hub immediately!';
+                } else {
+                    banner.className = 'action-banner safe';
+                    banner.textContent = '✅ CONTINUE — Cargo is safe';
+                }
+
+                // Update truck marker
+                if (s.lat && s.lon) {
+                    if (!truckMarker) {
+                        truckMarker = L.marker([s.lat, s.lon], { icon: truckIcon }).addTo(map);
+                        map.setView([s.lat, s.lon], 8);
+                    } else {
+                        truckMarker.setLatLng([s.lat, s.lon]);
+                    }
+                    truckMarker.bindPopup(`<b>${SHIPMENT_ID}</b><br>
+                        ${s.product_type} | ${temp?.toFixed(1)}°C<br>
+                        ${s.origin} → ${s.destination}<br>
+                        Risk: ${(risk * 100).toFixed(0)}%`);
+                }
+
+                // Fetch nearest hubs
+                fetchNearestHubs();
+
+            } catch (e) {
+                console.error('Update error:', e);
+            }
+        }
+
+        // ── Fetch nearest hubs ──
+        async function fetchNearestHubs() {
+            try {
+                const resp = await fetch(`/api/nearest-hubs/${SHIPMENT_ID}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const hubList = document.getElementById('hubList');
+                hubList.innerHTML = '';
+
+                // Clear old hub markers + route
+                hubMarkers.forEach(m => map.removeLayer(m));
+                hubMarkers = [];
+                if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+
+                data.nearest_hubs.forEach((hub, idx) => {
+                    // Hub card
+                    const card = document.createElement('div');
+                    card.className = 'hub-card' + (idx === 0 ? ' recommended' : '');
+
+                    const occColor = hub.occupied_pct > 80 ? '#ff5252' : hub.occupied_pct > 60 ? '#ffc107' : '#4caf50';
+
+                    card.innerHTML = `
+                        <div class="hub-info">
+                            <h4>${idx === 0 ? '⭐ ' : ''}${hub.name}</h4>
+                            <div class="details">
+                                Capacity: ${hub.capacity_tonnes}T | Accepts: ${hub.accepts.join(', ')}
+                            </div>
+                            <div class="occupancy-bar">
+                                <div class="occupancy-fill" style="width:${hub.occupied_pct}%; background:${occColor}"></div>
+                            </div>
+                        </div>
+                        <div class="hub-metrics">
+                            <div class="distance">${hub.distance_km} km</div>
+                            <div class="eta">ETA: ${hub.eta_minutes} min</div>
+                            <div class="cost">₹${hub.diversion_cost_inr.toLocaleString()}</div>
+                        </div>
+                    `;
+                    hubList.appendChild(card);
+
+                    // Hub marker on map
+                    const marker = L.marker([hub.lat, hub.lon], { icon: hubIcon(hub.status) }).addTo(map);
+                    marker.bindPopup(`<b>${hub.name}</b><br>
+                        Status: ${hub.status}<br>
+                        Occupancy: ${hub.occupied_pct}%<br>
+                        Distance: ${hub.distance_km} km`);
+                    hubMarkers.push(marker);
+
+                    // Route line to recommended hub
+                    if (idx === 0 && data.truck_lat) {
+                        routeLine = L.polyline(
+                            [[data.truck_lat, data.truck_lon], [hub.lat, hub.lon]],
+                            { color: '#4caf50', weight: 3, dashArray: '10,8', opacity: 0.8 }
+                        ).addTo(map);
+                    }
+                });
+
+                // Navigate button for recommended hub
+                if (data.nearest_hubs.length > 0) {
+                    const btn = document.createElement('button');
+                    btn.className = 'navigate-btn';
+                    btn.textContent = `📍 Navigate to ${data.nearest_hubs[0].name}`;
+                    btn.onclick = () => {
+                        const h = data.nearest_hubs[0];
+                        window.open(`https://www.google.com/maps/dir/${data.truck_lat},${data.truck_lon}/${h.lat},${h.lon}`, '_blank');
+                    };
+                    hubList.appendChild(btn);
+                }
+
+            } catch (e) {
+                console.error('Hub fetch error:', e);
+            }
+        }
+
+        // ── Auto-refresh ──
+        updateShipment();
+        setInterval(updateShipment, 3000);
+
+        // ── Fetch driver notifications ──
+        const dismissedNotifs = new Set();
+
+        async function updateDriverNotifications() {
+            try {
+                const resp = await fetch(`/api/driver-notifications/${SHIPMENT_ID}`);
+                const notifs = await resp.json();
+                const list = document.getElementById('driverNotifList');
+                if (!notifs || notifs.length === 0) return;
+
+                // Filter dismissed
+                const active = notifs.filter((_, i) => !dismissedNotifs.has(i));
+                document.getElementById('driverNotifCount').textContent = active.length;
+
+                if (active.length === 0) {
+                    list.innerHTML = '<div style="font-size:11px;color:#5a6f85;text-align:center;padding:10px">All messages dismissed</div>';
+                    return;
+                }
+
+                list.innerHTML = [...active].reverse().map((n, displayIdx) => {
+                    const origIdx = notifs.indexOf(n);
+                    const isDivert = (n.type || '').includes('DIVERT');
+                    const isRepair = (n.type || '').includes('REPAIR');
+                    const cls = isDivert ? 'divert' : isRepair ? 'repair' : 'delivery';
+                    const icon = isDivert ? '🚨' : isRepair ? '🔧' : '✅';
+                    const label = isDivert ? 'DIVERT NOW' : isRepair ? 'REPAIR NEEDED' : 'DELIVERY REPORT';
+                    const time = n.timestamp ? n.timestamp.split('T')[1]?.substring(0, 8) : '';
+
+                    // Extract key info for compact view
+                    const lines = (n.message || '').split('\n').filter(l => l.trim());
+                    const summary = lines.slice(0, 4).join('\n');
+
+                    return `<div class="driver-notif-item ${cls}" id="dnotif-${origIdx}">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <b style="font-size:12px">${icon} ${label}</b>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <span style="color:#5a6f85;font-size:10px">${time}</span>
+                                <span onclick="dismissNotif(${origIdx})" 
+                                      style="color:#5a6f85;cursor:pointer;font-size:16px;line-height:1;padding:0 4px;border-radius:4px;transition:all 0.2s"
+                                      onmouseover="this.style.color='#ff5252';this.style.background='rgba(255,82,82,0.1)'"
+                                      onmouseout="this.style.color='#5a6f85';this.style.background='transparent'"
+                                      title="Dismiss">×</span>
+                            </div>
+                        </div>
+                        <div class="driver-notif-msg">${summary.replace(/</g, '&lt;')}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) { }
+        }
+
+        function dismissNotif(idx) {
+            dismissedNotifs.add(idx);
+            const el = document.getElementById(`dnotif-${idx}`);
+            if (el) {
+                el.style.transition = 'all 0.3s';
+                el.style.opacity = '0';
+                el.style.maxHeight = '0';
+                el.style.padding = '0';
+                el.style.overflow = 'hidden';
+                setTimeout(() => updateDriverNotifications(), 300);
+            }
+        }
+
+        updateDriverNotifications();
+        setInterval(updateDriverNotifications, 3000);
+
+        // ── Fetch routing mode ──
+        async function updateRoutingMode() {
+            try {
+                const resp = await fetch('/api/shipments');
+                const ships = await resp.json();
+                const s = ships.find(sh => sh.shipment_id === SHIPMENT_ID);
+                if (!s) return;
+                const mode = s.routing_mode || 'BALANCED';
+                const badge = document.getElementById('routingModeBadge');
+                const icons = { 'SAFETY': '🛡️', 'BALANCED': '⚖️', 'ECO': '🌱' };
+                const classes = { 'SAFETY': 'safety', 'BALANCED': 'balanced', 'ECO': 'eco' };
+                badge.className = `routing-badge ${classes[mode] || 'balanced'}`;
+                badge.textContent = `${icons[mode] || '⚖️'} ${mode}`;
+                document.getElementById('routeInfo').textContent = `${s.origin} → ${s.destination}`;
+            } catch (e) { }
+        }
+        updateRoutingMode();
+        setInterval(updateRoutingMode, 3000);
+    </script>
+</body>
+
+</html>

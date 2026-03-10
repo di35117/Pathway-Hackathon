@@ -21,13 +21,17 @@ import sys
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
-        print("Available commands: rag, metrics, full, mqtt, sim-temp, sim-gps, sim-reefer, sim-door, sim-all, dashboard")
+        print("Available commands: rag, rag-v2, metrics, full, mqtt, sim-temp, sim-gps, sim-reefer, sim-door, sim-all, dashboard")
         return
 
     command = sys.argv[1].lower()
 
     if command == "rag":
         from pathway_rag_pipeline import run_rag_pipeline
+        run_rag_pipeline()
+
+    elif command == "rag-v2":
+        from pathway_rag_pipeline_v2 import run_rag_pipeline
         run_rag_pipeline()
 
     elif command == "metrics":

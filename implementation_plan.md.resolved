@@ -1,0 +1,157 @@
+# 🏆 Finals Sprint Plan — Expanded (March 7–13)
+
+## Feature Overview (12 Features)
+
+| # | Feature | Pathway? | Day | Impact |
+|---|---------|----------|-----|--------|
+| 1 | Fix Pathway RAG pipeline (live SOP) | ✅ | 1 | 🔴 Critical |
+| 2 | Fix Pathway MQTT bridge (risk tables) | ✅ | 1 | 🔴 Critical |
+| 3 | Nearest Hub on Map (route + distance) | — | 2 | 🔴 High |
+| 4 | Anomaly Detection (filter garbage data) | ✅ UDF | 2 | 🟡 Medium |
+| 5 | Premium Dashboard Visual Overhaul | — | 3 | 🔴 High |
+| 6 | Eco Mode Toggle (cost vs CO₂) | — | 3 | 🟡 Medium |
+| 7 | Temperature Prediction (30-min forecast) | ✅ UDF | 4 | 🔴 High |
+| 8 | Historical Trend Charts | ✅ csv.write | 4 | 🟡 Medium |
+| 9 | WhatsApp/Email Alert Notifications | — | 5 | 🔴 High |
+| 10 | Offline Edge Simulation | — | 5 | 🟡 Medium |
+| 11 | Carbon Credit Calculator | ✅ UDF | 5 | 🟡 Medium |
+| 12 | Full Testing + Practice + Backup | — | 6 | 🔴 Critical |
+
+---
+
+## Day 1 (Mar 7): Pathway Core
+
+### 1. Fix Pathway RAG Pipeline
+- Fix `pw.io.http.rest_connector` so `/v2/answer` returns proper JSON
+- Dashboard calls Pathway RAG first → direct Gemini fallback
+- Test: `curl -X POST http://localhost:8765/v2/answer -d '{"prompt":"temp exceeds threshold"}'`
+
+### 2. Fix Pathway MQTT Bridge
+- `pw.io.python.ConnectorSubject` ← MQTT sensor events
+- `@pw.udf` for excursion detection + risk scoring
+- `pw.io.csv.write` → `./metrics/pathway_risk_scores.csv`
+- Add to [replay.sh](file:///Users/tarunsingh/Desktop/hackathon/hack/replay.sh)
+
+---
+
+## Day 2 (Mar 8): Hub Routing + Anomaly Detection
+
+### 3. Nearest Hub on Map
+Show cold storage hubs on the map. When DIVERT triggers:
+- Draw a route line from truck → nearest hub using Leaflet polyline
+- Show distance, ETA, and hub name in the alert
+- Hub data: 15 cold storage locations across India (hardcoded realistic data)
+- Visual: blue marker for hubs, red dashed line for diversion route
+
+### 4. Anomaly Detection (Pathway UDF)
+Filter garbage sensor data before risk scoring:
+```python
+@pw.udf
+def is_valid_reading(temp: float, prev_temp: float) -> bool:
+    """Reject impossible readings: -999, +999, or >10°C jump in 2 seconds"""
+    if temp < -50 or temp > 80:
+        return False  # physically impossible
+    if abs(temp - prev_temp) > 10:
+        return False  # sensor glitch
+    return True
+```
+- Show on dashboard: "Filtered X anomalous readings" counter
+- Demonstrates data quality handling for judges
+
+---
+
+## Day 3 (Mar 9): Premium Dashboard
+
+### 5. Visual Overhaul
+- **Animated ₹ counter**: value saved counting up in real-time (JavaScript odometer effect)
+- **Color-coded markers**: 🟢→🟡→🔴 based on risk with pulse animation
+- **Shipment popup**: show temp, risk %, product type, last 10 temp readings as sparkline
+- **Alert cards redesign**: expandable SOP section, severity badges
+- **Dark glassmorphism**: frosted glass sidebar panels
+- **Live event counter**: "Processing 4,200 events/min" with animated number
+
+### 6. Eco Mode Toggle
+- Toggle switch in header: **💰 Cost Mode** ↔ **🌱 Eco Mode**
+- `POST /api/eco-mode` toggles `objective_mode` for all shipments
+- In eco mode: CO₂ card glows green, shows "X kg CO₂ saved"
+- In cost mode: ₹ saved card highlighted
+
+---
+
+## Day 4 (Mar 10): Prediction + History
+
+### 7. Temperature Prediction (Pathway UDF) 🔥
+```python
+@pw.udf
+def predict_temp_30min(temps: list) -> float:
+    """Linear regression on last N readings → forecast 30 min ahead"""
+    slope = (temps[-1] - temps[0]) / len(temps)
+    return temps[-1] + slope * 15  # 15 intervals × 2 sec = 30 min
+```
+- Dashboard shows: "⚠️ SHP_07: Predicted 9.2°C in 30 min (threshold: 8°C)"
+- Yellow warning banner BEFORE the excursion happens
+- **This is the killer feature** — "We predict failures before they occur"
+
+### 8. Historical Trend Charts
+- Store temp readings per shipment (last 100 readings)
+- `/api/history/<shipment_id>` returns array
+- Chart.js line chart in shipment popup showing temp over time + threshold lines
+- Pathway `pw.io.csv.write` dumps periodic snapshots
+
+---
+
+## Day 5 (Mar 11): Notifications + Offline + Carbon
+
+### 9. WhatsApp/Email Alert Notifications
+- **Option A**: Twilio WhatsApp API (free sandbox for demo)
+- **Option B**: Email via SMTP (Gmail)
+- **Option C**: Simulated — show "📱 WhatsApp sent to driver" in alert log with a realistic notification preview UI on dashboard
+- When DIVERT fires → send notification with: shipment ID, temp, action, nearest hub
+- Best demo approach: show the notification UI on dashboard + actual WhatsApp message on your phone
+
+### 10. Offline Edge Simulation
+- Simulate network disconnection: truck goes "offline" for 60 seconds
+- During offline: gateway buffers readings locally (show buffer in UI)
+- When back online: bulk sync all buffered events → dashboard shows catch-up
+- Dashboard shows: "📡 SHP_12: OFFLINE (buffering 30 readings)" in orange
+- On reconnect: "📡 SHP_12: BACK ONLINE — synced 30 readings"
+- Simple to implement: simulator pauses MQTT, collects locally, then sends burst
+
+### 11. Carbon Credit Calculator (Pathway UDF)
+```python
+@pw.udf
+def calculate_carbon_credits(waste_avoided_kg: float, cargo_type: str) -> dict:
+    # kg CO₂e per kg food waste (IPCC factors)
+    factors = {"dairy": 3.2, "meat": 27.0, "seafood": 8.5, "vaccines": 1.0}
+    co2_saved = waste_avoided_kg * factors.get(cargo_type, 5.0)
+    # 1 carbon credit = 1 tonne CO₂
+    credits = co2_saved / 1000
+    credit_value_inr = credits * 1500  # ~$18/credit
+    return {"co2_saved_kg": co2_saved, "credits": credits, "value_inr": credit_value_inr}
+```
+- Dashboard card: "🌱 Carbon Credits Earned: 2.4 credits (₹3,600)"
+- Great for ESG angle — companies care about this
+
+---
+
+## Day 6 (Mar 12): Testing + Practice
+
+### 12. Full Testing
+- Kill all → [./replay.sh](file:///Users/tarunsingh/Desktop/hackathon/hack/replay.sh) → verify everything works
+- Test each feature individually
+- Record backup demo video (screen recording)
+- Practice 5-min presentation: 3 min demo + 2 min Q&A
+- Prepare offline backup: pre-recorded video + screenshots
+
+---
+
+## Pathway Features Summary (6 components for judges)
+
+| # | Component | Pathway APIs Used |
+|---|-----------|------------------|
+| 1 | RAG Pipeline | `pw.io.fs.read`, `pw.io.http.rest_connector`, `@pw.udf` |
+| 2 | MQTT Bridge | `pw.io.python.ConnectorSubject`, `@pw.udf`, `pw.io.csv.write` |
+| 3 | Anomaly Filter | `@pw.udf` (data quality) |
+| 4 | Temp Prediction | `@pw.udf` (linear regression forecast) |
+| 5 | Carbon Calculator | `@pw.udf` (CO₂ + credit computation) |
+| 6 | Metrics Pipeline | `pw.Table`, `pw.Schema`, streaming aggregation |
