@@ -4,7 +4,7 @@
 import random
 from datetime import datetime
 from sim.config import CITIES, NUMBER_OF_SHIPMENTS
-from sop_parser import get_product_temp_ranges
+from core.sop_parser import get_product_temp_ranges
 
 random.seed(42)
 

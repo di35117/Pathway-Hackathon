@@ -404,7 +404,7 @@ Answer:"""
         print("[Metrics] Building metrics...")
         
         # Use metrics pipeline
-        from pathway_metrics_pipeline import PathwayMetricsPipeline
+        from pipeline.pathway_metrics_pipeline import PathwayMetricsPipeline
         
         metrics_pipeline = PathwayMetricsPipeline()
         metrics = metrics_pipeline.build_metrics_pipeline(
