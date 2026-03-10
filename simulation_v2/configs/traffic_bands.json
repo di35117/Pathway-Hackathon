@@ -1,0 +1,33 @@
+{
+  "road_classes": {
+    "highway": {
+      "baseline_speed_kmh": 65,
+      "peak_factor": 0.65,
+      "night_factor": 1.10,
+      "off_peak_factor": 1.0
+    },
+    "state_road": {
+      "baseline_speed_kmh": 50,
+      "peak_factor": 0.70,
+      "night_factor": 1.05,
+      "off_peak_factor": 1.0
+    },
+    "city": {
+      "baseline_speed_kmh": 30,
+      "peak_factor": 0.45,
+      "night_factor": 0.90,
+      "off_peak_factor": 1.0
+    },
+    "industrial": {
+      "baseline_speed_kmh": 20,
+      "peak_factor": 0.55,
+      "night_factor": 0.85,
+      "off_peak_factor": 1.0
+    }
+  },
+  "peak_hours": [
+    {"start": "08:00", "end": "10:30"},
+    {"start": "17:30", "end": "20:00"}
+  ],
+  "night_hours": {"start": "22:00", "end": "05:00"}
+}
