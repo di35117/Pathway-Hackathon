@@ -21,21 +21,17 @@ import sys
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
-        print("Available commands: rag, rag-v2, metrics, full, mqtt, sim-temp, sim-gps, sim-reefer, sim-door, sim-all, dashboard")
+        print("Available commands: rag, metrics, full, mqtt, sim-temp, sim-gps, sim-reefer, sim-door, sim-all, dashboard")
         return
 
     command = sys.argv[1].lower()
 
     if command == "rag":
-        from pipeline.pathway_rag_pipeline import run_rag_pipeline
-        run_rag_pipeline()
-
-    elif command == "rag-v2":
-        from pipeline.pathway_rag_pipeline_v2 import run_rag_pipeline
+        from pathway_rag_pipeline import run_rag_pipeline
         run_rag_pipeline()
 
     elif command == "metrics":
-        from pipeline.pathway_metrics_pipeline import PathwayMetricsPipeline, create_demo_alert_stream, create_demo_decision_stream
+        from pathway_metrics_pipeline import PathwayMetricsPipeline, create_demo_alert_stream, create_demo_decision_stream
         import pathway as pw
         import os
         os.makedirs("./demo_data", exist_ok=True)
@@ -61,7 +57,7 @@ def main():
         pw.run()
 
     elif command == "full":
-        from pipeline.pathway_integrated_full import LiveColdIntegratedPipeline
+        from pathway_integrated_full import LiveColdIntegratedPipeline
         pipeline = LiveColdIntegratedPipeline()
         pipeline.run()
 
@@ -115,7 +111,7 @@ def main():
         dash_main()
 
     elif command == "pathway-bridge":
-        from pipeline.pathway_mqtt_bridge import build_pathway_pipeline
+        from pathway_mqtt_bridge import build_pathway_pipeline
         build_pathway_pipeline()
 
     else:

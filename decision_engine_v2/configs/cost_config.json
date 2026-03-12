@@ -1,0 +1,10 @@
+{
+    "fuel_cost_per_km": 42,
+    "emission_factor_kg_per_km": 0.25,
+    "risk_reduction_if_divert": 0.70,
+    "diversion_threshold_buffer_inr": 500,
+    "monitor_closely_margin_pct": 0.15,
+    "base_hub_fixed_cost_inr": 5000,
+    "default_hub_distance_km": 30,
+    "compressor_reliability_decay": 0.02
+}

@@ -1,0 +1,66 @@
+{
+    "vaccines": {
+        "label": "Vaccines",
+        "ideal_temp_min": 2,
+        "ideal_temp_max": 8,
+        "max_exposure_minutes": 10,
+        "weights": {
+            "temp_sensitivity": 0.45,
+            "door_event": 0.20,
+            "compressor": 0.25,
+            "exposure_time": 0.30,
+            "eta_pressure": 0.15,
+            "drift_rate": 0.20
+        },
+        "cargo_value_per_kg": 15000,
+        "spoilage_rate_per_minute": 0.10
+    },
+    "seafood": {
+        "label": "Seafood",
+        "ideal_temp_min": 0,
+        "ideal_temp_max": 4,
+        "max_exposure_minutes": 30,
+        "weights": {
+            "temp_sensitivity": 0.35,
+            "door_event": 0.15,
+            "compressor": 0.20,
+            "exposure_time": 0.25,
+            "eta_pressure": 0.12,
+            "drift_rate": 0.15
+        },
+        "cargo_value_per_kg": 600,
+        "spoilage_rate_per_minute": 0.05
+    },
+    "dairy": {
+        "label": "Dairy",
+        "ideal_temp_min": 1,
+        "ideal_temp_max": 4,
+        "max_exposure_minutes": 60,
+        "weights": {
+            "temp_sensitivity": 0.25,
+            "door_event": 0.12,
+            "compressor": 0.15,
+            "exposure_time": 0.20,
+            "eta_pressure": 0.10,
+            "drift_rate": 0.12
+        },
+        "cargo_value_per_kg": 80,
+        "spoilage_rate_per_minute": 0.02
+    },
+    "frozen_meat": {
+        "label": "Frozen Meat",
+        "ideal_temp_min": -18,
+        "ideal_temp_max": -15,
+        "max_exposure_minutes": 120,
+        "weights": {
+            "temp_sensitivity": 0.20,
+            "door_event": 0.08,
+            "compressor": 0.12,
+            "exposure_time": 0.15,
+            "eta_pressure": 0.08,
+            "drift_rate": 0.10
+        },
+        "cargo_value_per_kg": 350,
+        "spoilage_rate_per_minute": 0.01
+    }
+}

@@ -1,0 +1,954 @@
+{
+    "stop_rules": {
+        "tea_break": {
+            "interval_hours_min": 2,
+            "interval_hours_max": 3,
+            "duration_minutes_min": 15,
+            "duration_minutes_max": 30,
+            "label": "Dhaba Stop"
+        },
+        "fuel_stop": {
+            "interval_km_min": 300,
+            "interval_km_max": 400,
+            "duration_minutes_min": 20,
+            "duration_minutes_max": 40,
+            "label": "Fuel Station"
+        },
+        "lunch_break": {
+            "window_start": "12:30",
+            "window_end": "14:00",
+            "duration_minutes_min": 45,
+            "duration_minutes_max": 60,
+            "label": "Lunch Break"
+        },
+        "loading_unloading": {
+            "duration_minutes_min": 30,
+            "duration_minutes_max": 90,
+            "label": "Loading/Unloading"
+        },
+        "warehouse_checkpoint": {
+            "duration_minutes_min": 10,
+            "duration_minutes_max": 20,
+            "label": "Warehouse Checkpoint"
+        }
+    },
+    "route_stops": {
+        "Delhi->Jaipur": [
+            {
+                "name": "Manesar Toll Plaza",
+                "lat": 28.3530,
+                "lng": 76.9380,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 35
+            },
+            {
+                "name": "Dharuhera Dhaba",
+                "lat": 28.2050,
+                "lng": 76.6180,
+                "type": "tea_break",
+                "km_from_origin": 70
+            },
+            {
+                "name": "Neemrana Fuel Stop",
+                "lat": 27.8800,
+                "lng": 76.2700,
+                "type": "fuel_stop",
+                "km_from_origin": 130
+            },
+            {
+                "name": "Behror Highway Dhaba",
+                "lat": 27.5570,
+                "lng": 76.0140,
+                "type": "tea_break",
+                "km_from_origin": 180
+            },
+            {
+                "name": "Shahpura Rest Area",
+                "lat": 27.3880,
+                "lng": 75.8740,
+                "type": "tea_break",
+                "km_from_origin": 220
+            }
+        ],
+        "Delhi->Bangalore": [
+            {
+                "name": "Faridabad Checkpoint",
+                "lat": 28.4100,
+                "lng": 77.3100,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 30
+            },
+            {
+                "name": "Mathura Fuel Point",
+                "lat": 27.4924,
+                "lng": 77.6737,
+                "type": "fuel_stop",
+                "km_from_origin": 160
+            },
+            {
+                "name": "Agra Dhaba Cluster",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 210
+            },
+            {
+                "name": "Jhansi Fuel Station",
+                "lat": 25.4358,
+                "lng": 78.5685,
+                "type": "fuel_stop",
+                "km_from_origin": 420
+            },
+            {
+                "name": "Bhopal Rest Stop",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "tea_break",
+                "km_from_origin": 750
+            },
+            {
+                "name": "Nagpur Checkpoint",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Hyderabad Fuel Station",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "fuel_stop",
+                "km_from_origin": 1500
+            },
+            {
+                "name": "Anantapur Dhaba",
+                "lat": 14.6800,
+                "lng": 77.5900,
+                "type": "tea_break",
+                "km_from_origin": 1800
+            }
+        ],
+        "Chennai->Delhi": [
+            {
+                "name": "Kanchipuram Checkpoint",
+                "lat": 12.7900,
+                "lng": 79.6900,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 75
+            },
+            {
+                "name": "Vellore Fuel Stop",
+                "lat": 12.5160,
+                "lng": 78.6569,
+                "type": "fuel_stop",
+                "km_from_origin": 140
+            },
+            {
+                "name": "Hyderabad Rest Stop",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "tea_break",
+                "km_from_origin": 630
+            },
+            {
+                "name": "Nagpur Checkpoint",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Bhopal Fuel Station",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "fuel_stop",
+                "km_from_origin": 1400
+            },
+            {
+                "name": "Agra Dhaba",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 1900
+            }
+        ],
+        "Chennai->Pune": [
+            {
+                "name": "Hosur Checkpoint",
+                "lat": 12.7409,
+                "lng": 77.8253,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 40
+            },
+            {
+                "name": "Bangalore Fuel Stop",
+                "lat": 12.9716,
+                "lng": 77.5946,
+                "type": "fuel_stop",
+                "km_from_origin": 350
+            },
+            {
+                "name": "Davangere Dhaba",
+                "lat": 14.4426,
+                "lng": 75.9200,
+                "type": "tea_break",
+                "km_from_origin": 550
+            },
+            {
+                "name": "Belgaum Checkpoint",
+                "lat": 15.8497,
+                "lng": 74.4977,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 750
+            },
+            {
+                "name": "Kolhapur Fuel Stop",
+                "lat": 16.7050,
+                "lng": 74.2433,
+                "type": "fuel_stop",
+                "km_from_origin": 850
+            }
+        ],
+        "Mumbai->Pune": [
+            {
+                "name": "Panvel Toll Plaza",
+                "lat": 18.9400,
+                "lng": 73.0300,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 25
+            },
+            {
+                "name": "Lonavala Rest Area",
+                "lat": 18.7500,
+                "lng": 73.4000,
+                "type": "tea_break",
+                "km_from_origin": 85
+            }
+        ],
+        "Kolkata->Bangalore": [
+            {
+                "name": "Kharagpur Checkpoint",
+                "lat": 22.3300,
+                "lng": 87.3200,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 120
+            },
+            {
+                "name": "Bhubaneswar Fuel Stop",
+                "lat": 20.2961,
+                "lng": 85.8245,
+                "type": "fuel_stop",
+                "km_from_origin": 460
+            },
+            {
+                "name": "Visakhapatnam Dhaba",
+                "lat": 17.7365,
+                "lng": 83.3013,
+                "type": "tea_break",
+                "km_from_origin": 800
+            },
+            {
+                "name": "Vijayawada Fuel Stop",
+                "lat": 16.5062,
+                "lng": 80.6480,
+                "type": "fuel_stop",
+                "km_from_origin": 1100
+            },
+            {
+                "name": "Kurnool Rest Area",
+                "lat": 15.4909,
+                "lng": 78.4867,
+                "type": "tea_break",
+                "km_from_origin": 1350
+            }
+        ],
+        "Kolkata->Jaipur": [
+            {
+                "name": "Durgapur Checkpoint",
+                "lat": 23.2500,
+                "lng": 87.0500,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 170
+            },
+            {
+                "name": "Dhanbad Fuel Stop",
+                "lat": 23.7957,
+                "lng": 86.4304,
+                "type": "fuel_stop",
+                "km_from_origin": 260
+            },
+            {
+                "name": "Varanasi Dhaba",
+                "lat": 25.3176,
+                "lng": 82.9739,
+                "type": "tea_break",
+                "km_from_origin": 679
+            },
+            {
+                "name": "Kanpur Fuel Stop",
+                "lat": 26.4499,
+                "lng": 80.3319,
+                "type": "fuel_stop",
+                "km_from_origin": 980
+            },
+            {
+                "name": "Agra Rest Area",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 1200
+            }
+        ],
+        "Guwahati->Kolkata": [
+            {
+                "name": "Cooch Behar Check Post",
+                "lat": 25.5788,
+                "lng": 89.2752,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 280
+            },
+            {
+                "name": "Siliguri Fuel Stop",
+                "lat": 26.1000,
+                "lng": 87.8700,
+                "type": "fuel_stop",
+                "km_from_origin": 450
+            },
+            {
+                "name": "Barwa Adda Dhaba",
+                "lat": 23.8640,
+                "lng": 86.9750,
+                "type": "tea_break",
+                "km_from_origin": 750
+            },
+            {
+                "name": "Durgapur Fuel Stop",
+                "lat": 23.2500,
+                "lng": 87.0500,
+                "type": "fuel_stop",
+                "km_from_origin": 850
+            }
+        ],
+        "Guwahati->Ranchi": [
+            {
+                "name": "Cooch Behar Checkpoint",
+                "lat": 25.5788,
+                "lng": 89.2752,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 280
+            },
+            {
+                "name": "Siliguri Fuel Stop",
+                "lat": 26.1000,
+                "lng": 87.8700,
+                "type": "fuel_stop",
+                "km_from_origin": 450
+            },
+            {
+                "name": "Hazaribagh Dhaba",
+                "lat": 23.6700,
+                "lng": 85.8600,
+                "type": "tea_break",
+                "km_from_origin": 700
+            }
+        ],
+        "Patna->Nagpur": [
+            {
+                "name": "Varanasi Fuel Stop",
+                "lat": 25.3176,
+                "lng": 82.9739,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Rewa Dhaba",
+                "lat": 24.5300,
+                "lng": 80.8300,
+                "type": "tea_break",
+                "km_from_origin": 420
+            },
+            {
+                "name": "Jabalpur Rest Area",
+                "lat": 23.5300,
+                "lng": 80.3300,
+                "type": "tea_break",
+                "km_from_origin": 560
+            }
+        ],
+        "Hyderabad->Bhopal": [
+            {
+                "name": "Nirmal Checkpoint",
+                "lat": 18.5700,
+                "lng": 78.1000,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 180
+            },
+            {
+                "name": "Nagpur Fuel Stop",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "fuel_stop",
+                "km_from_origin": 500
+            },
+            {
+                "name": "Hoshangabad Dhaba",
+                "lat": 22.7500,
+                "lng": 78.2000,
+                "type": "tea_break",
+                "km_from_origin": 650
+            }
+        ],
+        "Hyderabad->Varanasi": [
+            {
+                "name": "Nanded Fuel Stop",
+                "lat": 19.1386,
+                "lng": 77.3172,
+                "type": "fuel_stop",
+                "km_from_origin": 260
+            },
+            {
+                "name": "Nagpur Checkpoint",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 500
+            },
+            {
+                "name": "Jabalpur Dhaba",
+                "lat": 23.5300,
+                "lng": 80.3300,
+                "type": "tea_break",
+                "km_from_origin": 780
+            }
+        ],
+        "Nagpur->Kochi": [
+            {
+                "name": "Hyderabad Checkpoint",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 500
+            },
+            {
+                "name": "Bangalore Fuel Stop",
+                "lat": 12.9716,
+                "lng": 77.5946,
+                "type": "fuel_stop",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Salem Dhaba",
+                "lat": 11.6643,
+                "lng": 78.1460,
+                "type": "tea_break",
+                "km_from_origin": 1200
+            },
+            {
+                "name": "Thrissur Fuel Stop",
+                "lat": 10.5276,
+                "lng": 76.2144,
+                "type": "fuel_stop",
+                "km_from_origin": 1400
+            }
+        ],
+        "Nagpur->Chandigarh": [
+            {
+                "name": "Bhopal Checkpoint",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 350
+            },
+            {
+                "name": "Jhansi Fuel Stop",
+                "lat": 25.4358,
+                "lng": 78.5685,
+                "type": "fuel_stop",
+                "km_from_origin": 600
+            },
+            {
+                "name": "Agra Dhaba",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 800
+            },
+            {
+                "name": "Delhi Rest Area",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "tea_break",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Panipat Fuel Stop",
+                "lat": 29.3800,
+                "lng": 76.9700,
+                "type": "fuel_stop",
+                "km_from_origin": 1150
+            }
+        ],
+        "Ahmedabad->Delhi": [
+            {
+                "name": "Mahesana Checkpoint",
+                "lat": 23.8500,
+                "lng": 72.3300,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 100
+            },
+            {
+                "name": "Udaipur Fuel Stop",
+                "lat": 24.5854,
+                "lng": 73.7125,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Jaipur Dhaba",
+                "lat": 26.9124,
+                "lng": 75.7873,
+                "type": "tea_break",
+                "km_from_origin": 530
+            },
+            {
+                "name": "Dharuhera Fuel Stop",
+                "lat": 28.2050,
+                "lng": 76.6180,
+                "type": "fuel_stop",
+                "km_from_origin": 830
+            }
+        ],
+        "Pune->Nagpur": [
+            {
+                "name": "Ahmednagar Checkpoint",
+                "lat": 19.0948,
+                "lng": 74.7480,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 120
+            },
+            {
+                "name": "Aurangabad Fuel Stop",
+                "lat": 19.8762,
+                "lng": 75.3433,
+                "type": "fuel_stop",
+                "km_from_origin": 230
+            },
+            {
+                "name": "Wardha Dhaba",
+                "lat": 20.7500,
+                "lng": 78.0500,
+                "type": "tea_break",
+                "km_from_origin": 530
+            }
+        ],
+        "Bangalore->Jaipur": [
+            {
+                "name": "Anantapur Checkpoint",
+                "lat": 14.6800,
+                "lng": 77.5900,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 300
+            },
+            {
+                "name": "Hyderabad Fuel Stop",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "fuel_stop",
+                "km_from_origin": 560
+            },
+            {
+                "name": "Nagpur Dhaba",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "tea_break",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Bhopal Fuel Stop",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "fuel_stop",
+                "km_from_origin": 1400
+            },
+            {
+                "name": "Agra Rest Area",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 1800
+            }
+        ],
+        "Indore->Ranchi": [
+            {
+                "name": "Bhopal Checkpoint",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 200
+            },
+            {
+                "name": "Nagpur Fuel Stop",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "fuel_stop",
+                "km_from_origin": 570
+            },
+            {
+                "name": "Raipur Dhaba",
+                "lat": 21.7100,
+                "lng": 80.6200,
+                "type": "tea_break",
+                "km_from_origin": 750
+            },
+            {
+                "name": "Hazaribagh Fuel Stop",
+                "lat": 23.6700,
+                "lng": 85.8600,
+                "type": "fuel_stop",
+                "km_from_origin": 1100
+            }
+        ],
+        "Chandigarh->Ahmedabad": [
+            {
+                "name": "Ambala Checkpoint",
+                "lat": 30.3400,
+                "lng": 76.8200,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 50
+            },
+            {
+                "name": "Delhi Fuel Stop",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Jaipur Dhaba",
+                "lat": 26.9124,
+                "lng": 75.7873,
+                "type": "tea_break",
+                "km_from_origin": 530
+            },
+            {
+                "name": "Udaipur Fuel Stop",
+                "lat": 24.5854,
+                "lng": 73.7125,
+                "type": "fuel_stop",
+                "km_from_origin": 830
+            }
+        ],
+        "Chandigarh->Indore": [
+            {
+                "name": "Ambala Checkpoint",
+                "lat": 30.3400,
+                "lng": 76.8200,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 50
+            },
+            {
+                "name": "Delhi Fuel Stop",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Agra Dhaba",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 460
+            },
+            {
+                "name": "Bhopal Fuel Stop",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "fuel_stop",
+                "km_from_origin": 800
+            }
+        ],
+        "Chandigarh->Kolkata": [
+            {
+                "name": "Karnal Checkpoint",
+                "lat": 29.9600,
+                "lng": 76.8700,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 120
+            },
+            {
+                "name": "Delhi Fuel Stop",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Kanpur Dhaba",
+                "lat": 26.4499,
+                "lng": 80.3319,
+                "type": "tea_break",
+                "km_from_origin": 700
+            },
+            {
+                "name": "Varanasi Fuel Stop",
+                "lat": 25.3176,
+                "lng": 82.9739,
+                "type": "fuel_stop",
+                "km_from_origin": 980
+            },
+            {
+                "name": "Barwa Adda Dhaba",
+                "lat": 23.8640,
+                "lng": 86.9750,
+                "type": "tea_break",
+                "km_from_origin": 1300
+            }
+        ],
+        "Chandigarh->Lucknow": [
+            {
+                "name": "Karnal Checkpoint",
+                "lat": 29.9600,
+                "lng": 76.8700,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 120
+            },
+            {
+                "name": "Delhi Fuel Stop",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Agra Dhaba",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "tea_break",
+                "km_from_origin": 460
+            }
+        ],
+        "Jaipur->Chennai": [
+            {
+                "name": "Bhilwara Fuel Stop",
+                "lat": 25.7500,
+                "lng": 75.2000,
+                "type": "fuel_stop",
+                "km_from_origin": 250
+            },
+            {
+                "name": "Bhopal Dhaba",
+                "lat": 23.2599,
+                "lng": 77.4126,
+                "type": "tea_break",
+                "km_from_origin": 600
+            },
+            {
+                "name": "Nagpur Checkpoint",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 950
+            },
+            {
+                "name": "Hyderabad Fuel Stop",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "fuel_stop",
+                "km_from_origin": 1400
+            },
+            {
+                "name": "Vellore Dhaba",
+                "lat": 12.5160,
+                "lng": 78.6569,
+                "type": "tea_break",
+                "km_from_origin": 1850
+            }
+        ],
+        "Jaipur->Chandigarh": [
+            {
+                "name": "Behror Fuel Stop",
+                "lat": 27.5570,
+                "lng": 76.0140,
+                "type": "fuel_stop",
+                "km_from_origin": 150
+            },
+            {
+                "name": "Delhi Checkpoint",
+                "lat": 28.7041,
+                "lng": 77.1025,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 280
+            },
+            {
+                "name": "Panipat Dhaba",
+                "lat": 29.3800,
+                "lng": 76.9700,
+                "type": "tea_break",
+                "km_from_origin": 380
+            },
+            {
+                "name": "Ambala Fuel Stop",
+                "lat": 30.3400,
+                "lng": 76.8200,
+                "type": "fuel_stop",
+                "km_from_origin": 460
+            }
+        ],
+        "Guwahati->Pune": [
+            {
+                "name": "Siliguri Checkpoint",
+                "lat": 26.1000,
+                "lng": 87.8700,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 450
+            },
+            {
+                "name": "Barwa Adda Fuel Stop",
+                "lat": 23.8640,
+                "lng": 86.9750,
+                "type": "fuel_stop",
+                "km_from_origin": 750
+            },
+            {
+                "name": "Kolkata Dhaba",
+                "lat": 22.5726,
+                "lng": 88.3639,
+                "type": "tea_break",
+                "km_from_origin": 1000
+            },
+            {
+                "name": "Bhubaneswar Fuel Stop",
+                "lat": 20.2961,
+                "lng": 85.8245,
+                "type": "fuel_stop",
+                "km_from_origin": 1450
+            },
+            {
+                "name": "Nagpur Checkpoint",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 1850
+            },
+            {
+                "name": "Nashik Dhaba",
+                "lat": 19.9975,
+                "lng": 73.7898,
+                "type": "tea_break",
+                "km_from_origin": 2200
+            }
+        ],
+        "Chennai->Chandigarh": [
+            {
+                "name": "Vellore Checkpoint",
+                "lat": 12.5160,
+                "lng": 78.6569,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 140
+            },
+            {
+                "name": "Hyderabad Fuel Stop",
+                "lat": 17.3850,
+                "lng": 78.4867,
+                "type": "fuel_stop",
+                "km_from_origin": 630
+            },
+            {
+                "name": "Nagpur Dhaba",
+                "lat": 21.1458,
+                "lng": 79.0882,
+                "type": "tea_break",
+                "km_from_origin": 1050
+            },
+            {
+                "name": "Agra Fuel Stop",
+                "lat": 27.1767,
+                "lng": 78.0081,
+                "type": "fuel_stop",
+                "km_from_origin": 1900
+            },
+            {
+                "name": "Panipat Checkpoint",
+                "lat": 29.3800,
+                "lng": 76.9700,
+                "type": "warehouse_checkpoint",
+                "km_from_origin": 2100
+            }
+        ]
+    },
+    "known_stops_generic": [
+        {
+            "name": "Murthal Dhaba Cluster",
+            "lat": 28.9900,
+            "lng": 77.0348,
+            "type": "tea_break"
+        },
+        {
+            "name": "Mathura Fuel Point",
+            "lat": 27.4924,
+            "lng": 77.6737,
+            "type": "fuel_stop"
+        },
+        {
+            "name": "Vapi Checkpoint",
+            "lat": 20.3714,
+            "lng": 72.9047,
+            "type": "warehouse_checkpoint"
+        },
+        {
+            "name": "Hosur Check Post",
+            "lat": 12.7409,
+            "lng": 77.8253,
+            "type": "warehouse_checkpoint"
+        },
+        {
+            "name": "Palsana Dhaba",
+            "lat": 21.0970,
+            "lng": 72.6710,
+            "type": "tea_break"
+        },
+        {
+            "name": "Kanpur Fuel Stop",
+            "lat": 26.4499,
+            "lng": 80.3319,
+            "type": "fuel_stop"
+        },
+        {
+            "name": "Barwa Adda Checkpoint",
+            "lat": 23.8640,
+            "lng": 86.9750,
+            "type": "warehouse_checkpoint"
+        },
+        {
+            "name": "Salem Rest Area",
+            "lat": 11.6643,
+            "lng": 78.1460,
+            "type": "tea_break"
+        },
+        {
+            "name": "Udaipur Fuel Station",
+            "lat": 24.5854,
+            "lng": 73.7125,
+            "type": "fuel_stop"
+        },
+        {
+            "name": "Belgaum Checkpoint",
+            "lat": 15.8497,
+            "lng": 74.4977,
+            "type": "warehouse_checkpoint"
+        },
+        {
+            "name": "Dhanbad Rest Stop",
+            "lat": 23.7957,
+            "lng": 86.4304,
+            "type": "tea_break"
+        },
+        {
+            "name": "Nashik Highway Hub",
+            "lat": 19.9975,
+            "lng": 73.7898,
+            "type": "fuel_stop"
+        }
+    ]
+}
