@@ -49,8 +49,9 @@ ROUTING_DEFAULTS = {
     "flowers": "ECO",
 }
 
-# Exposure decay per tick when temp is back in range
-EXPOSURE_DECAY_PER_TICK = 0.5
+# Exposure tracking: each tick ≈ 2 seconds = 0.033 minutes
+EXPOSURE_INCREMENT_PER_TICK = 0.033  # ~2 seconds in minutes
+EXPOSURE_DECAY_PER_TICK = 0.02       # slow decay when temp returns to safe range
 
 shipment_state = {}
 event_counter = 0
@@ -263,9 +264,9 @@ def on_message(client, userdata, msg):
         shipment_state[shipment_id]["last_temp"] = raw_temp
         shipment_state[shipment_id]["value_inr"] = data.get("cargo_value_inr", shipment_state[shipment_id]["value_inr"])
 
-        # Exposure tracking: increment when out of range, decay when back
+        # Exposure tracking: increment by real-time minutes when out of range, decay when back
         if raw_temp < safe_min or raw_temp > safe_max:
-            shipment_state[shipment_id]["exposure_minutes"] += 1
+            shipment_state[shipment_id]["exposure_minutes"] += EXPOSURE_INCREMENT_PER_TICK
         else:
             current = shipment_state[shipment_id]["exposure_minutes"]
             shipment_state[shipment_id]["exposure_minutes"] = max(0.0, current - EXPOSURE_DECAY_PER_TICK)

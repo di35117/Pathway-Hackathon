@@ -26,7 +26,7 @@ log = logging.getLogger("dashboard")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# ── Global State ────────────────────────────────────────────────
+# ── Global State 
 shipments = {}      # shipment_id -> latest state
 alerts = []         # recent alerts (last 100)
 diverted_shipments_saved = {}  # shipment_id -> saved_amount (prevent double-counting)
@@ -138,14 +138,18 @@ def _sop_file_watcher():
             log.warning(f"SOP watcher error: {e}")
             time.sleep(5)
 
-# Load API keys
-for var in ["GOOGLE_API_KEY_imp", "GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GEMINI_API_KEY"]:
-    k = os.getenv(var)
-    if k and k not in API_KEYS:
-        API_KEYS.append(k)
+# Load API keys dynamically from .env
+from dotenv import dotenv_values
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+env_vars = dotenv_values(env_path)
+for k, v in env_vars.items():
+    if v and ("API_KEY" in k or "GEMINI" in k) and "HUGGING" not in k:
+        if v not in API_KEYS:
+            API_KEYS.append(v)
+
 if API_KEYS:
     os.environ["GEMINI_API_KEY"] = API_KEYS[0]
-    log.info(f"🔑 Loaded {len(API_KEYS)} API key(s)")
+    log.info(f"🔑 Loaded {len(API_KEYS)} API key(s) from .env")
 
 # Cache recent RAG answers to avoid duplicate API calls
 import requests as http_requests  # for calling Pathway RAG

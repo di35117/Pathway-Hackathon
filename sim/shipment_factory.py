@@ -53,19 +53,21 @@ PRODUCT_PROFILES = _build_product_profiles()
 #   "cold_drift"→ Drifts below safe_min (for frozen products)
 
 DEMO_SCENARIOS = {
-    # ── Immediate diversions (show DIVERT + WhatsApp within 5 seconds) ──
-    0:  {"product": "Seafood",         "mode": "critical"},   # SHP_1
-    1:  {"product": "Frozen_Meat",     "mode": "critical"},   # SHP_2
-    2:  {"product": "Dairy",           "mode": "critical"},   # SHP_3
-    3:  {"product": "Vaccines",        "mode": "critical"},   # SHP_4
-    4:  {"product": "Pharmaceuticals", "mode": "critical"},   # SHP_5
+    # ── Staggered high-priority drifts (DIVERT one-by-one after ~30-90s) ──
+    # Each has a different "drift_offset" so they breach threshold at different times.
+    # With drift_rate ~0.15°C/tick (every 2s), offset=3 → breaches in ~40s, offset=6 → ~80s
+    0:  {"product": "Seafood",         "mode": "drift", "drift_offset": 3.0},   # SHP_1 → ~40s
+    1:  {"product": "Frozen_Meat",     "mode": "drift", "drift_offset": 4.0},   # SHP_2 → ~53s
+    2:  {"product": "Dairy",           "mode": "drift", "drift_offset": 5.0},   # SHP_3 → ~67s
+    3:  {"product": "Vaccines",        "mode": "drift", "drift_offset": 6.0},   # SHP_4 → ~80s
+    4:  {"product": "Pharmaceuticals", "mode": "drift", "drift_offset": 7.0},   # SHP_5 → ~93s
 
-    # ── Drifting shipments (show gradual risk increase → DIVERT after ~20-30s) ──
-    5:  {"product": "Fruits",          "mode": "drift"},      # SHP_6
-    6:  {"product": "Vegetables",      "mode": "drift"},      # SHP_7
-    7:  {"product": "Ice_Cream",       "mode": "drift"},      # SHP_8
-    8:  {"product": "Seafood",         "mode": "drift"},      # SHP_9
-    9:  {"product": "Flowers",         "mode": "drift"},      # SHP_10
+    # ── Drifting shipments (show gradual risk increase → DIVERT after ~100-150s) ──
+    5:  {"product": "Fruits",          "mode": "drift", "drift_offset": 8.0},   # SHP_6
+    6:  {"product": "Vegetables",      "mode": "drift", "drift_offset": 9.0},   # SHP_7
+    7:  {"product": "Ice_Cream",       "mode": "drift", "drift_offset": 10.0},  # SHP_8
+    8:  {"product": "Seafood",         "mode": "drift", "drift_offset": 11.0},  # SHP_9
+    9:  {"product": "Flowers",         "mode": "drift", "drift_offset": 12.0},  # SHP_10
 
     # ── Healthy shipments (show normal operation, green status) ──
     10: {"product": "Dairy",           "mode": "stable"},     # SHP_11
@@ -79,12 +81,12 @@ DEMO_SCENARIOS = {
     18: {"product": "Seafood",         "mode": "stable"},     # SHP_19
     19: {"product": "Dairy",           "mode": "stable"},     # SHP_20
 
-    # ── More drift for variety ──
-    20: {"product": "Dairy",           "mode": "drift"},      # SHP_21
-    21: {"product": "Frozen_Meat",     "mode": "drift"},      # SHP_22
-    22: {"product": "Pharmaceuticals", "mode": "drift"},      # SHP_23
-    23: {"product": "Vegetables",      "mode": "drift"},      # SHP_24
-    24: {"product": "Seafood",         "mode": "drift"},      # SHP_25
+    # ── More drift for variety (later breach ~120-180s) ──
+    20: {"product": "Dairy",           "mode": "drift", "drift_offset": 8.0},   # SHP_21
+    21: {"product": "Frozen_Meat",     "mode": "drift", "drift_offset": 9.0},   # SHP_22
+    22: {"product": "Pharmaceuticals", "mode": "drift", "drift_offset": 10.0},  # SHP_23
+    23: {"product": "Vegetables",      "mode": "drift", "drift_offset": 11.0},  # SHP_24
+    24: {"product": "Seafood",         "mode": "drift", "drift_offset": 12.0},  # SHP_25
 }
 
 
@@ -130,12 +132,11 @@ def generate_shipments():
         safe_max = product["safe_max"]
         safe_mid = (safe_min + safe_max) / 2
 
-        if mode == "critical":
-            # Start ABOVE safe_max by 3-5°C → immediate high risk
-            base_temp = safe_max + random.uniform(3, 5)
-        elif mode == "drift":
-            # Start just below safe_max → will breach in ~10-15 seconds
-            base_temp = safe_max - random.uniform(0.3, 0.8)
+        if mode == "drift":
+            # Use drift_offset from scenario to stagger when each shipment breaches threshold
+            # Higher offset = starts further below safe_max = takes longer to breach
+            drift_offset = scenario.get("drift_offset", 0.5) if scenario else random.uniform(0.3, 0.8)
+            base_temp = safe_max - drift_offset
         elif mode == "cold_drift":
             # Start just above safe_min → drifts below
             base_temp = safe_min + random.uniform(0.3, 0.8)
@@ -165,7 +166,7 @@ def generate_shipments():
             "sensitivity": product["sensitivity"],
 
             "base_temp": base_temp,
-            "temp_mode": mode if mode != "critical" else "drift",
+            "temp_mode": mode,
         }
 
         shipments.append(shipment)
