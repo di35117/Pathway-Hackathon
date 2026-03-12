@@ -17,9 +17,11 @@ import pathway as pw
 import os
 import json
 import time
+import hashlib
 import threading
 from datetime import datetime
 from dotenv import load_dotenv
+import litellm as _litellm
 
 load_dotenv()
 
@@ -64,6 +66,10 @@ def get_sop_sync_status() -> dict:
         return dict(_sop_last_sync)
 
 
+# ── SOP file cache with hash-based invalidation ────────────────
+_sop_cache = {"content": None, "hash": None}
+
+
 def _read_sop_files_from_disk() -> str:
     """Read all SOP files directly from disk (always fresh)."""
     context_parts = []
@@ -83,6 +89,57 @@ def _read_sop_files_from_disk() -> str:
     return joined
 
 
+def _read_sop_files_cached() -> str:
+    """Read SOP files with content-hash cache — only re-reads if files changed."""
+    file_hashes = []
+    try:
+        for fname in sorted(os.listdir(WATCHED_DOCS_DIR)):
+            fpath = os.path.join(WATCHED_DOCS_DIR, fname)
+            if os.path.isfile(fpath) and not fname.startswith('.'):
+                stat = os.stat(fpath)
+                file_hashes.append(f"{fname}:{stat.st_mtime}:{stat.st_size}")
+    except Exception as e:
+        print(f"  ⚠ Error checking SOP files: {e}")
+        return _sop_cache["content"] or ""
+
+    current_hash = hashlib.md5("|".join(file_hashes).encode()).hexdigest()
+
+    if _sop_cache["hash"] == current_hash and _sop_cache["content"]:
+        return _sop_cache["content"]  # Cache hit — no disk I/O
+
+    # Cache miss — read from disk
+    context = _read_sop_files_from_disk()
+    _sop_cache["content"] = context
+    _sop_cache["hash"] = current_hash
+    return context
+
+
+def _get_relevant_chunks(query: str, sop_text: str, max_chars: int = 4000) -> str:
+    """Simple keyword-based relevance filtering to reduce prompt size."""
+    chunks = sop_text.split("\n\n")
+    query_words = set(query.lower().split())
+
+    scored = []
+    for chunk in chunks:
+        if not chunk.strip():
+            continue
+        chunk_words = set(chunk.lower().split())
+        overlap = len(query_words & chunk_words)
+        scored.append((overlap, chunk))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    result = []
+    total = 0
+    for _, chunk in scored:
+        if total + len(chunk) > max_chars:
+            break
+        result.append(chunk)
+        total += len(chunk)
+
+    return "\n\n".join(result) if result else sop_text[:max_chars]
+
+
 # ── Pathway UDFs ────────────────────────────────────────────────
 
 @pw.udf
@@ -98,19 +155,24 @@ def decode_document(data: bytes) -> str:
         return ""
 
 
+# Track last-working key/model combo to skip known-bad ones
+_last_working = {"api_key": None, "model": None}
+
+
 @pw.udf
 def build_answer(query: str) -> str:
     """Call LLM with LIVE SOP context to answer the query.
     
-    Unlike V1's static SOP_CONTEXT, this reads the SOP files fresh
-    from disk on each query. Pathway's streaming mode ensures this UDF
-    is triggered whenever documents change, and the fresh read guarantees
-    we always have the latest content.
+    Optimizations over V1:
+    - Uses cached SOP reads (only re-reads on file change)
+    - Relevance-filters context to reduce prompt token count
+    - Tries last-working key/model first to avoid fallback cascade
+    - Reduced timeout (10s vs 30s)
     """
-    import litellm as _litellm
+    global _last_working
 
-    # Read SOP content fresh from disk (always up-to-date)
-    sop_context = _read_sop_files_from_disk()
+    # Read SOP content with cache (only re-reads if files changed)
+    sop_context = _read_sop_files_cached()
     
     if not sop_context:
         return "No SOP documents found in watched_docs directory."
@@ -128,8 +190,25 @@ def build_answer(query: str) -> str:
         "gemini/gemini-1.5-flash",
     ]
 
-    prompt = PROMPT_TEMPLATE.format(context=sop_context[:12000], query=query)
+    # Relevance-filter context to reduce prompt size (~4K instead of 12K)
+    relevant_context = _get_relevant_chunks(query, sop_context, max_chars=4000)
+    prompt = PROMPT_TEMPLATE.format(context=relevant_context, query=query)
 
+    # Try last-working combo first for fast path
+    if _last_working["api_key"] and _last_working["model"]:
+        try:
+            response = _litellm.completion(
+                model=_last_working["model"],
+                messages=[{"role": "user", "content": prompt}],
+                api_key=_last_working["api_key"],
+                timeout=10,
+                num_retries=0,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception:
+            pass  # Fall through to full cascade
+
+    # Full cascade as fallback
     for api_key in api_keys:
         os.environ["GEMINI_API_KEY"] = api_key
         for model in models:
@@ -138,8 +217,11 @@ def build_answer(query: str) -> str:
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
                     api_key=api_key,
-                    timeout=30,
+                    timeout=10,
+                    num_retries=0,
                 )
+                # Remember this working combo for next time
+                _last_working = {"api_key": api_key, "model": model}
                 return response.choices[0].message.content.strip()
             except Exception:
                 continue
@@ -193,7 +275,7 @@ def run_rag_pipeline(host="0.0.0.0", port=8765):
         port=port,
         route="/v2/answer",
         schema=QuerySchema,
-        autocommit_duration_ms=50,
+        autocommit_duration_ms=500,  # Increased from 50 to reduce framework overhead
         delete_completed_queries=True,
     )
     print(f"  ✓ REST /v2/answer on {host}:{port}")

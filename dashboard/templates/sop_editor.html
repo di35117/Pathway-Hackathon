@@ -497,11 +497,77 @@
             background: #1e3050;
             border-radius: 3px;
         }
+
+        /* ── Responsive Mobile Design ── */
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                overflow-y: auto;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+                padding: 16px;
+            }
+            .header-left {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            .nav-links {
+                width: 100%;
+                gap: 12px;
+                justify-content: flex-start;
+            }
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .main-content {
+                flex-direction: column;
+                overflow: visible;
+                height: auto;
+            }
+            .editor-panel {
+                width: 100%;
+                height: 50vh; /* Fixed visual proportion so user can scroll naturally past it */
+                min-height: 350px;
+                border-right: none;
+                border-bottom: 4px solid #000;
+                flex: none;
+            }
+            .query-panel {
+                width: 100%;
+                height: 75vh;
+                min-height: 500px;
+                flex: none;
+            }
+            .panel-title {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 12px 16px;
+            }
+            .editor-toolbar {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            .answer-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .answer-query {
+                max-width: 100%;
+                white-space: normal;
+            }
+        }
     </style>
 </head>
 
 <body>
-    <!-- Header -->
     <div class="header">
         <div class="header-left">
             <h1>🧊 LiveCold</h1>
@@ -520,10 +586,8 @@
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
 
-        <!-- Left: SOP Editor -->
         <div class="editor-panel">
             <div class="panel-title">
                 📄 SOP Document Editor
@@ -536,7 +600,6 @@
             <textarea id="sopEditor" spellcheck="false" placeholder="Loading SOP document..."></textarea>
         </div>
 
-        <!-- Right: Query Panel -->
         <div class="query-panel">
             <div class="panel-title">🤖 RAG Query Panel</div>
 

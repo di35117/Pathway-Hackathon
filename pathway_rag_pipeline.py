@@ -16,6 +16,7 @@ import pathway as pw
 import os
 import json
 import time
+import litellm as _litellm
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -57,10 +58,15 @@ except Exception as e:
 
 
 # ── Pathway UDFs ────────────────────────────────────────────────
+
+# Track last-working key/model combo to skip known-bad ones
+_last_working_v1 = {"api_key": None, "model": None}
+
+
 @pw.udf
 def build_answer(query: str) -> str:
     """Call LLM with SOP context to answer the query."""
-    import litellm as _litellm
+    global _last_working_v1
 
     # Build API key list
     api_keys = []
@@ -77,6 +83,21 @@ def build_answer(query: str) -> str:
 
     prompt = PROMPT_TEMPLATE.format(context=SOP_CONTEXT[:8000], query=query)
 
+    # Try last-working combo first for fast path
+    if _last_working_v1["api_key"] and _last_working_v1["model"]:
+        try:
+            response = _litellm.completion(
+                model=_last_working_v1["model"],
+                messages=[{"role": "user", "content": prompt}],
+                api_key=_last_working_v1["api_key"],
+                timeout=10,
+                num_retries=0,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception:
+            pass  # Fall through to full cascade
+
+    # Full cascade as fallback
     for api_key in api_keys:
         os.environ["GEMINI_API_KEY"] = api_key
         for model in models:
@@ -85,8 +106,11 @@ def build_answer(query: str) -> str:
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
                     api_key=api_key,
-                    timeout=30,
+                    timeout=10,
+                    num_retries=0,
                 )
+                # Remember this working combo for next time
+                _last_working_v1 = {"api_key": api_key, "model": model}
                 return response.choices[0].message.content.strip()
             except Exception:
                 continue
@@ -121,7 +145,7 @@ def run_rag_pipeline(host="0.0.0.0", port=8765):
         port=port,
         route="/v2/answer",
         schema=QuerySchema,
-        autocommit_duration_ms=50,
+        autocommit_duration_ms=500,  # Increased from 50 to reduce framework overhead
         delete_completed_queries=True,
     )
     print(f"  ✓ pw.io.http.rest_connector on {host}:{port}")

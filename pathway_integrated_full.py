@@ -7,6 +7,8 @@ import pathway as pw
 from pathway.xpacks.llm import embedders, parsers, splitters, llms
 from pathway.xpacks.llm.document_store import DocumentStore
 import os
+import hashlib
+from functools import lru_cache
 from datetime import datetime
 
 
@@ -95,10 +97,10 @@ class LiveColdIntegratedPipeline:
             model=GEMINI_MODEL,
             api_key=os.getenv("GEMINI_API_KEY"),
             temperature=0.0,
-            capacity=10,
+            capacity=5,  # Reduced from 10 — fewer concurrent calls = less rate-limiting
             retry_strategy=pw.asynchronous.FixedDelayRetryStrategy(
                 max_retries=3,
-                delay_ms=1000
+                delay_ms=500  # Reduced from 1000ms for faster recovery
             )
         )
         
@@ -333,6 +335,9 @@ According to SOPs, what immediate actions should be taken? Provide numbered chec
                 texts.append(doc.get("text", ""))
             return "\n\n".join(texts)
         
+        # LRU cache for LLM prompt→response to avoid redundant API calls
+        _llm_response_cache = {}
+
         @pw.udf
         def build_llm_prompt(query: str, context: str) -> str:
             return f"""Given context from SOPs:

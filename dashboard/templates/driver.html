@@ -14,268 +14,148 @@
             box-sizing: border-box;
         }
 
+        /* ── Softer Color Scheme (Lighter Gray) ── */
+        :root {
+            --bg-main: #272a30;     /* Lighter gray background */
+            --bg-panel: #32363e;    /* Slightly lighter gray for panels */
+            --border-color: #454a54; /* Visible neutral border */
+            --text-primary: #f8fafc;
+            --text-secondary: #a1b0c4;
+            --accent-blue: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-red: #ef4444;
+            --accent-orange: #fbbf24;
+        }
+
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0a0e17;
-            color: #e0e6f0;
+            background: var(--bg-main);
+            color: var(--text-primary);
             height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden; 
         }
 
         /* ── Header ── */
         .header {
-            background: linear-gradient(135deg, #0d1526, #162040);
-            padding: 10px 16px;
+            background: var(--bg-panel);
+            padding: 12px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #1e3050;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            z-index: 10;
         }
 
         .header h1 {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
-            background: linear-gradient(90deg, #4fc3f7, #81d4fa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--accent-blue);
         }
 
         .header .shipment-badge {
-            background: #1e3a5f;
-            padding: 4px 10px;
+            background: rgba(56, 189, 248, 0.15);
+            padding: 4px 12px;
             border-radius: 12px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            color: #4fc3f7;
+            color: var(--accent-blue);
+        }
+
+        /* ── Action Banner ── */
+        .action-banner {
+            padding: 12px 20px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 15px;
+            display: none;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .action-banner.divert {
+            display: block;
+            background: #991b1b;
+            color: #fca5a5;
+            animation: pulseBanner 2s infinite;
+        }
+
+        .action-banner.safe {
+            display: block;
+            background: #166534;
+            color: #86efac;
+        }
+
+        @keyframes pulseBanner {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+
+        /* ── Main Layout (Desktop) ── */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ── Left Sidebar ── */
+        .sidebar {
+            width: 380px;
+            background: var(--bg-main);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
         }
 
         /* ── Status Bar ── */
         .status-bar {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            padding: 8px 12px;
-            background: #0d1526;
+            gap: 10px;
+            padding: 16px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .stat-card {
-            background: rgba(30, 48, 80, 0.6);
+            background: var(--bg-main);
             border-radius: 10px;
-            padding: 10px;
+            padding: 12px 10px;
             text-align: center;
-            border: 1px solid rgba(79, 195, 247, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .stat-card .label {
-            font-size: 10px;
-            color: #8899aa;
+            font-size: 11px;
+            color: var(--text-secondary);
             text-transform: uppercase;
+            font-weight: 600;
         }
 
         .stat-card .value {
             font-size: 20px;
             font-weight: 700;
-            margin-top: 2px;
+            margin-top: 4px;
         }
 
-        .stat-card.temp .value {
-            color: #4caf50;
-        }
+        .stat-card.temp .value { color: var(--accent-green); }
+        .stat-card.temp.danger .value { color: var(--accent-red); }
+        .stat-card.risk .value { color: var(--accent-orange); }
+        .stat-card.risk.high .value { color: var(--accent-red); }
+        .stat-card.speed .value { color: var(--accent-blue); }
 
-        .stat-card.temp.danger .value {
-            color: #ff5252;
-        }
-
-        .stat-card.risk .value {
-            color: #ffc107;
-        }
-
-        .stat-card.risk.high .value {
-            color: #ff5252;
-        }
-
-        .stat-card.speed .value {
-            color: #4fc3f7;
-        }
-
-        /* ── Map ── */
-        #map {
-            flex: 1;
-            z-index: 1;
-        }
-
-        /* ── Hub Panel ── */
-        .hub-panel {
-            background: #0d1526;
-            padding: 12px;
-            border-top: 1px solid #1e3050;
-            max-height: 240px;
-            overflow-y: auto;
-        }
-
-        .hub-panel h3 {
-            font-size: 13px;
-            color: #4fc3f7;
-            margin-bottom: 8px;
-        }
-
-        .hub-card {
-            background: rgba(30, 48, 80, 0.5);
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 8px;
-            border: 1px solid rgba(79, 195, 247, 0.15);
+        .route-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .hub-card.recommended {
-            border-color: #4caf50;
-            background: rgba(76, 175, 80, 0.1);
-        }
-
-        .hub-info h4 {
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .hub-info .details {
-            font-size: 11px;
-            color: #8899aa;
-            margin-top: 2px;
-        }
-
-        .hub-metrics {
-            text-align: right;
-        }
-
-        .hub-metrics .distance {
-            font-size: 18px;
-            font-weight: 700;
-            color: #4fc3f7;
-        }
-
-        .hub-metrics .eta {
-            font-size: 11px;
-            color: #8899aa;
-        }
-
-        .hub-metrics .cost {
-            font-size: 11px;
-            color: #ffc107;
-        }
-
-        .navigate-btn {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #1b5e20, #2e7d32);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 8px;
-        }
-
-        .navigate-btn:active {
-            transform: scale(0.98);
-        }
-
-        .action-banner {
-            padding: 10px 16px;
-            text-align: center;
-            font-weight: 700;
-            font-size: 14px;
-            display: none;
-        }
-
-        .action-banner.divert {
-            display: block;
-            background: linear-gradient(135deg, #b71c1c, #d32f2f);
-            color: white;
-            animation: pulseBanner 2s infinite;
-        }
-
-        .action-banner.safe {
-            display: block;
-            background: linear-gradient(135deg, #1b5e20, #2e7d32);
-            color: white;
-        }
-
-        @keyframes pulseBanner {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.8;
-            }
-        }
-
-        .occupancy-bar {
-            height: 4px;
-            background: #1e3050;
-            border-radius: 2px;
-            margin-top: 4px;
-            overflow: hidden;
-        }
-
-        .occupancy-fill {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.5s;
-        }
-
-        /* ── Driver Notifications ── */
-        .driver-notif-panel {
-            background: #0d1526;
-            border-top: 1px solid #1e3050;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .driver-notif-panel h3 {
-            font-size: 13px;
-            color: #ff9800;
-            padding: 8px 12px 4px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .driver-notif-item {
-            padding: 8px 12px;
-            border-bottom: 1px solid rgba(30, 48, 80, 0.6);
-            font-size: 12px;
-            animation: slideIn 0.3s ease;
-        }
-
-        .driver-notif-item.divert {
-            border-left: 3px solid #ff5252;
-            background: rgba(255, 82, 82, 0.05);
-        }
-
-        .driver-notif-item.repair {
-            border-left: 3px solid #ff9800;
-            background: rgba(255, 152, 0, 0.05);
-        }
-
-        .driver-notif-item.delivery {
-            border-left: 3px solid #66bb6a;
-            background: rgba(102, 187, 106, 0.05);
-        }
-
-        .driver-notif-msg {
-            white-space: pre-line;
-            color: #8899aa;
-            font-size: 11px;
-            line-height: 1.4;
-            margin-top: 4px;
+            padding: 12px 16px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .routing-badge {
@@ -283,32 +163,218 @@
             border-radius: 12px;
             font-size: 11px;
             font-weight: 700;
-            letter-spacing: 0.5px;
+        }
+        .routing-badge.safety { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .routing-badge.balanced { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
+        .routing-badge.eco { background: rgba(74, 222, 128, 0.2); color: var(--accent-green); }
+
+        /* ── Mobile Map Toggle Button ── */
+        .toggle-map-btn {
+            display: none;
+            margin: 16px;
+            padding: 14px;
+            background: #0284c7;
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
-        .routing-badge.safety {
-            background: rgba(255, 82, 82, 0.2);
-            color: #ff5252;
+        /* ── Driver Notifications ── */
+        .driver-notif-panel {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .routing-badge.balanced {
-            background: rgba(79, 195, 247, 0.2);
-            color: #4fc3f7;
+        .section-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .routing-badge.eco {
-            background: rgba(102, 187, 106, 0.2);
-            color: #66bb6a;
+        .driver-notif-item {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease; 
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
+        .driver-notif-item.divert { border-left: 4px solid var(--accent-red); }
+        .driver-notif-item.repair { border-left: 4px solid var(--accent-orange); }
+        .driver-notif-item.delivery { border-left: 4px solid var(--accent-green); }
+
+        .driver-notif-msg {
+            white-space: pre-line;
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+
+        /* ── Hub Panel ── */
+        .hub-panel {
+            padding: 16px;
+            flex: 1;
+        }
+
+        .hub-card {
+            background: var(--bg-panel);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hub-card.recommended {
+            border-color: var(--accent-green);
+            background: rgba(74, 222, 128, 0.05);
+        }
+
+        .hub-info h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px;}
+        .hub-info .details { font-size: 12px; color: var(--text-secondary); }
+
+        .hub-metrics { text-align: right; }
+        .hub-metrics .distance { font-size: 16px; font-weight: 700; color: var(--accent-blue); }
+        .hub-metrics .eta { font-size: 12px; color: var(--text-secondary); margin-top: 2px;}
+        .hub-metrics .cost { font-size: 12px; color: var(--accent-orange); }
+
+        .navigate-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #15803d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .occupancy-bar {
+            height: 4px;
+            background: var(--bg-main);
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .occupancy-fill { height: 100%; transition: width 0.5s; }
+
+        /* ── Map Area ── */
+        .map-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .mobile-map-header {
+            display: none;
+            padding: 12px 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1001;
+        }
+
+        .close-map-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+
+        /* ── Map CSS Filters ── */
+        .light-green-labels {
+            /* Inverts dark labels to white, then tints to a soft light green */
+            filter: invert(1) sepia(100%) hue-rotate(85deg) saturate(150%) brightness(1.4) drop-shadow(0px 0px 2px rgba(0,0,0,0.8));
+        }
+
+        /* ── Toast Notifications ── */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-blue);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* ── Responsive Design (Mobile & Tablet) ── */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 100%;
+                border-right: none;
             }
-
-            to {
-                opacity: 1;
+            .toggle-map-btn {
+                display: block; 
+            }
+            .map-container {
+                display: none; 
+            }
+            .map-container.active {
+                display: flex;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                z-index: 2000;
+                background: var(--bg-main);
+            }
+            .map-container.active .mobile-map-header {
+                display: flex;
+            }
+            .toast-container {
+                bottom: 24px;
+                right: 50%;
+                transform: translateX(50%);
+                align-items: center;
+            }
+            .toast {
+                transform: translateY(100%);
+            }
+            .toast.show {
                 transform: translateY(0);
             }
         }
@@ -323,40 +389,58 @@
 
     <div class="action-banner" id="actionBanner"></div>
 
-    <div class="status-bar">
-        <div class="stat-card temp" id="tempCard">
-            <div class="label">Temperature</div>
-            <div class="value" id="tempValue">--°C</div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="status-bar">
+                <div class="stat-card temp" id="tempCard">
+                    <div class="label">Temperature</div>
+                    <div class="value" id="tempValue">--°C</div>
+                </div>
+                <div class="stat-card risk" id="riskCard">
+                    <div class="label">Risk</div>
+                    <div class="value" id="riskValue">--%</div>
+                </div>
+                <div class="stat-card speed">
+                    <div class="label">Speed</div>
+                    <div class="value" id="speedValue">-- km/h</div>
+                </div>
+            </div>
+
+            <div class="route-header">
+                <span style="font-size:12px;color:var(--text-secondary)">🗺️ Route: <b id="routeInfo" style="color:var(--text-primary)">Loading...</b></span>
+                <span class="routing-badge balanced" id="routingModeBadge">⚖️ BALANCED</span>
+            </div>
+
+            <button class="toggle-map-btn" onclick="toggleMobileMap()">🗺️ Open Map View</button>
+
+            <div class="driver-notif-panel" id="driverNotifPanel">
+                <div class="section-title">
+                    <span>📲 Messages</span>
+                    <span id="driverNotifCount" style="color:var(--accent-blue);font-weight:bold;">0</span>
+                </div>
+                <div id="driverNotifList" style="font-size:13px;color:var(--text-secondary);text-align:center;padding:10px">
+                    No messages yet
+                </div>
+            </div>
+
+            <div class="hub-panel" id="hubPanel">
+                <div class="section-title">📦 Nearest Cold Storage Hubs</div>
+                <div id="hubList">
+                    <div style="font-size:13px;color:var(--text-secondary);text-align:center;">Loading hubs...</div>
+                </div>
+            </div>
         </div>
-        <div class="stat-card risk" id="riskCard">
-            <div class="label">Risk</div>
-            <div class="value" id="riskValue">--%</div>
-        </div>
-        <div class="stat-card speed">
-            <div class="label">Speed</div>
-            <div class="value" id="speedValue">-- km/h</div>
+
+        <div class="map-container" id="mapContainer">
+            <div class="mobile-map-header">
+                <span style="font-weight:600;">Live Map Tracking</span>
+                <button class="close-map-btn" onclick="toggleMobileMap()">❌ Close</button>
+            </div>
+            <div id="map"></div>
         </div>
     </div>
 
-    <div
-        style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0d1526;border-bottom:1px solid #1e3050">
-        <span style="font-size:11px;color:#8899aa">🗺️ Route: <b id="routeInfo">Loading...</b></span>
-        <span class="routing-badge balanced" id="routingModeBadge">⚖️ BALANCED</span>
-    </div>
-
-    <div id="map"></div>
-
-    <div class="driver-notif-panel" id="driverNotifPanel">
-        <h3>📲 Messages <span id="driverNotifCount" style="font-size:11px;color:#4fc3f7">0</span></h3>
-        <div id="driverNotifList" style="font-size:11px;color:#5a6f85;text-align:center;padding:10px">
-            No messages yet
-        </div>
-    </div>
-
-    <div class="hub-panel" id="hubPanel">
-        <h3>📦 Nearest Cold Storage Hubs</h3>
-        <div id="hubList">Loading hubs...</div>
-    </div>
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
         const SHIPMENT_ID = "{{ shipment_id }}";
@@ -364,14 +448,36 @@
 
         // ── Initialize map ──
         map = L.map('map').setView([22.5, 78.9], 5);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        
+        // Base dark map WITHOUT text (allows deep zooming without losing tiles)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '© CartoDB',
-            maxZoom: 18
+            maxZoom: 22,
+            maxNativeZoom: 16
         }).addTo(map);
+
+        // Text labels ONLY layer, using Voyager for richer local text data
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 22,
+            maxNativeZoom: 16,
+            className: 'light-green-labels'
+        }).addTo(map);
+
+        // Mobile Map Toggle Logic
+        function toggleMobileMap() {
+            const mapEl = document.getElementById('mapContainer');
+            mapEl.classList.toggle('active');
+            
+            if(mapEl.classList.contains('active')) {
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 100);
+            }
+        }
 
         // Custom truck icon
         const truckIcon = L.divIcon({
-            html: '<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">🚚</div>',
+            html: '<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🚚</div>',
             iconSize: [32, 32],
             iconAnchor: [16, 16],
             className: ''
@@ -379,13 +485,30 @@
 
         // Hub icon
         function hubIcon(status) {
-            const color = status === 'available' ? '#4caf50' : '#ff9800';
             return L.divIcon({
-                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))">🏭</div>`,
+                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))">🏭</div>`,
                 iconSize: [28, 28],
                 iconAnchor: [14, 14],
                 className: ''
             });
+        }
+
+        // Toast Notification System
+        function showToast(message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         // ── Fetch shipment data ──
@@ -459,17 +582,16 @@
                 if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
 
                 data.nearest_hubs.forEach((hub, idx) => {
-                    // Hub card
                     const card = document.createElement('div');
                     card.className = 'hub-card' + (idx === 0 ? ' recommended' : '');
 
-                    const occColor = hub.occupied_pct > 80 ? '#ff5252' : hub.occupied_pct > 60 ? '#ffc107' : '#4caf50';
+                    const occColor = hub.occupied_pct > 80 ? '#ef4444' : hub.occupied_pct > 60 ? '#fbbf24' : '#22c55e';
 
                     card.innerHTML = `
                         <div class="hub-info">
                             <h4>${idx === 0 ? '⭐ ' : ''}${hub.name}</h4>
                             <div class="details">
-                                Capacity: ${hub.capacity_tonnes}T | Accepts: ${hub.accepts.join(', ')}
+                                Cap: ${hub.capacity_tonnes}T | Accepts: ${hub.accepts.join(', ')}
                             </div>
                             <div class="occupancy-bar">
                                 <div class="occupancy-fill" style="width:${hub.occupied_pct}%; background:${occColor}"></div>
@@ -495,7 +617,7 @@
                     if (idx === 0 && data.truck_lat) {
                         routeLine = L.polyline(
                             [[data.truck_lat, data.truck_lon], [hub.lat, hub.lon]],
-                            { color: '#4caf50', weight: 3, dashArray: '10,8', opacity: 0.8 }
+                            { color: '#22c55e', weight: 4, dashArray: '10,8', opacity: 0.8 }
                         ).addTo(map);
                     }
                 });
@@ -507,7 +629,8 @@
                     btn.textContent = `📍 Navigate to ${data.nearest_hubs[0].name}`;
                     btn.onclick = () => {
                         const h = data.nearest_hubs[0];
-                        window.open(`https://www.google.com/maps/dir/${data.truck_lat},${data.truck_lon}/${h.lat},${h.lon}`, '_blank');
+                        // Standard Google Maps Directions format
+                        window.open(`https://www.google.com/maps/dir/?api=1&origin=$${data.truck_lat},${data.truck_lon}&destination=${h.lat},${h.lon}`, '_blank');
                     };
                     hubList.appendChild(btn);
                 }
@@ -536,11 +659,12 @@
                 document.getElementById('driverNotifCount').textContent = active.length;
 
                 if (active.length === 0) {
-                    list.innerHTML = '<div style="font-size:11px;color:#5a6f85;text-align:center;padding:10px">All messages dismissed</div>';
+                    list.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);text-align:center;padding:10px">All messages dismissed</div>';
                     return;
                 }
 
-                list.innerHTML = [...active].reverse().map((n, displayIdx) => {
+                const currentHtml = list.innerHTML;
+                const newHtml = [...active].reverse().map((n, displayIdx) => {
                     const origIdx = notifs.indexOf(n);
                     const isDivert = (n.type || '').includes('DIVERT');
                     const isRepair = (n.type || '').includes('REPAIR');
@@ -549,25 +673,29 @@
                     const label = isDivert ? 'DIVERT NOW' : isRepair ? 'REPAIR NEEDED' : 'DELIVERY REPORT';
                     const time = n.timestamp ? n.timestamp.split('T')[1]?.substring(0, 8) : '';
 
-                    // Extract key info for compact view
                     const lines = (n.message || '').split('\n').filter(l => l.trim());
                     const summary = lines.slice(0, 4).join('\n');
 
                     return `<div class="driver-notif-item ${cls}" id="dnotif-${origIdx}">
                         <div style="display:flex;justify-content:space-between;align-items:center">
-                            <b style="font-size:12px">${icon} ${label}</b>
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <span style="color:#5a6f85;font-size:10px">${time}</span>
+                            <b style="font-size:13px;color:var(--text-primary)">${icon} ${label}</b>
+                            <div style="display:flex;gap:12px;align-items:center">
+                                <span style="color:var(--text-secondary);font-size:11px">${time}</span>
                                 <span onclick="dismissNotif(${origIdx})" 
-                                      style="color:#5a6f85;cursor:pointer;font-size:16px;line-height:1;padding:0 4px;border-radius:4px;transition:all 0.2s"
-                                      onmouseover="this.style.color='#ff5252';this.style.background='rgba(255,82,82,0.1)'"
-                                      onmouseout="this.style.color='#5a6f85';this.style.background='transparent'"
+                                      style="color:var(--text-secondary);cursor:pointer;font-size:18px;line-height:1;transition:all 0.2s"
+                                      onmouseover="this.style.color='var(--accent-red)'"
+                                      onmouseout="this.style.color='var(--text-secondary)'"
                                       title="Dismiss">×</span>
                             </div>
                         </div>
-                        <div class="driver-notif-msg">${summary.replace(/</g, '&lt;')}</div>
+                        <div class="driver-notif-msg">${summary.replace(/</g, '<')}</div>
                     </div>`;
                 }).join('');
+
+                if (!currentHtml.includes(newHtml.substring(0, 50))) {
+                    list.innerHTML = newHtml;
+                }
+
             } catch (e) { }
         }
 
@@ -575,13 +703,16 @@
             dismissedNotifs.add(idx);
             const el = document.getElementById(`dnotif-${idx}`);
             if (el) {
-                el.style.transition = 'all 0.3s';
+                // Smooth collapse animation
                 el.style.opacity = '0';
-                el.style.maxHeight = '0';
-                el.style.padding = '0';
-                el.style.overflow = 'hidden';
-                setTimeout(() => updateDriverNotifications(), 300);
+                el.style.transform = 'translateX(-20px)';
+                
+                setTimeout(() => {
+                    el.style.display = 'none';
+                    updateDriverNotifications();
+                }, 300);
             }
+            showToast('Message dismissed ✅');
         }
 
         updateDriverNotifications();

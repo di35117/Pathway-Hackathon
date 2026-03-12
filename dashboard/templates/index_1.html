@@ -3,10 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LiveCold — Cold Chain Intelligence Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -19,11 +20,10 @@
             font-family: 'Inter', system-ui, sans-serif;
             background: #060b14;
             color: #e0e6f0;
-            /* FIX #3: removed overflow:hidden — let inner panels handle their own scroll.
-               height:100vh stays so the outer shell is viewport-tall. */
             height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         /* ── Header ── */
@@ -101,15 +101,13 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* ── Main wrapper — fills remaining height after header ── */
+        /* ── Main wrapper ── */
         .main-wrapper {
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* clip overflow; children scroll internally */
             min-height: 0;
-            /* needed for flex children to shrink */
         }
 
         /* ── Metrics Bar ── */
@@ -119,7 +117,6 @@
             background: linear-gradient(180deg, #0a1020, #080e1a);
             border-bottom: 1px solid rgba(79, 195, 247, 0.06);
             flex-shrink: 0;
-            /* never squish the metric cards */
         }
 
         .metric-card {
@@ -191,12 +188,9 @@
             background: linear-gradient(180deg, rgba(76, 175, 80, 0.05), transparent);
         }
 
-        /* ── Prediction Banner ──
-           FIX #1: Removed the duplicate display:flex that was overriding display:none.
-           Banner is hidden by default; JS toggles inline style. */
+        /* ── Prediction Banner ── */
         .prediction-banner {
             display: none;
-            /* ← only one display declaration now */
             padding: 6px 24px;
             background: linear-gradient(90deg, rgba(255, 183, 77, 0.1), rgba(255, 183, 77, 0.05));
             border-bottom: 1px solid rgba(255, 183, 77, 0.2);
@@ -219,15 +213,24 @@
             font-size: 11px;
         }
 
-        /* ── Content Row — map + right panel, fills remaining height ──
-           FIX #2: replaced the broken 3-row grid with a proper flex layout.
-           The outer main-wrapper is a column flex; this content-row is the
-           flex:1 child, so it truly fills whatever height is left. */
+        /* ── Content Row: left-panel | map | right-panel ── */
         .content-row {
             flex: 1;
             display: flex;
             overflow: hidden;
             min-height: 0;
+        }
+
+        /* ── Left Panel (Alerts only) ── */
+        .left-panel {
+            width: 300px;
+            flex-shrink: 0;
+            background: #080e1a;
+            border-right: 1px solid rgba(79, 195, 247, 0.06);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
         }
 
         /* ── Map ── */
@@ -237,10 +240,10 @@
             min-width: 0;
         }
 
-        /* FIX #12: explicit height:100% so Leaflet always gets a real size */
         #map {
             width: 100%;
             height: 100%;
+            background: #060b14;
         }
 
         .map-overlay {
@@ -263,21 +266,32 @@
             color: #8899aa;
         }
 
-        /* ── Right Panel ──
-           FIX #4/#5: give the panel a bounded height so flex children scroll properly */
+        /* ── Map CSS Filters ── */
+        .base-map-grey {
+            filter: brightness(2.2) contrast(0.85) grayscale(1);
+        }
+
+        .green-labels {
+            filter: invert(1) sepia(100%) hue-rotate(85deg) saturate(180%) brightness(1.6) drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+        }
+
+        .map-close-btn {
+            display: none;
+        }
+
+        /* ── Right Panel (Fleet + Notifications) ── */
         .right-panel {
-            width: 380px;
+            width: 360px;
             flex-shrink: 0;
             background: #080e1a;
             border-left: 1px solid rgba(79, 195, 247, 0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* clip; children handle their own scroll */
             height: 100%;
-            /* match the content-row height */
         }
 
+        /* ── Shared panel chrome ── */
         .panel-section {
             border-bottom: 1px solid rgba(79, 195, 247, 0.06);
         }
@@ -304,14 +318,35 @@
             font-size: 10px;
         }
 
-        /* ── Alerts ──
-           FIX #6: use flex-based proportion instead of fixed 45vh so it
-           doesn't overflow on short screens. */
+        /* ── Search Input ── */
+        .panel-search {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(79, 195, 247, 0.2);
+            color: #e0e6f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            width: 110px;
+            margin-left: auto;
+            margin-right: 8px;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .panel-search::placeholder {
+            color: #5a6f85;
+        }
+
+        .panel-search:focus {
+            border-color: #4fc3f7;
+        }
+
+        /* ── Alerts ── */
         .alerts-section {
             display: flex;
             flex-direction: column;
-            flex: 4;
-            /* takes ~40% of the right panel */
+            flex: 1;
             min-height: 0;
             overflow: hidden;
         }
@@ -398,7 +433,7 @@
             transition: max-height 0.3s ease;
         }
 
-        .alert-item.expanded .sop-rec {
+        .alert-item.expanded>.sop-rec {
             max-height: 300px;
         }
 
@@ -406,16 +441,24 @@
             font-size: 10px;
             color: #4fc3f7;
             cursor: pointer;
-            margin-top: 4px;
-            font-weight: 500;
+            margin-top: 5px;
+            font-weight: 600;
+            background: rgba(79, 195, 247, 0.08);
+            border: 1px solid rgba(79, 195, 247, 0.18);
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .sop-toggle:hover {
+            background: rgba(79, 195, 247, 0.16);
         }
 
         /* ── Fleet ── */
         .fleet-section {
             display: flex;
             flex-direction: column;
-            flex: 5;
-            /* takes ~50% of the right panel */
+            flex: 6;
             min-height: 0;
             overflow: hidden;
         }
@@ -483,6 +526,7 @@
             text-align: center;
             opacity: 0.3;
             transition: opacity 0.2s;
+            text-decoration: none;
         }
 
         .shipment-item:hover .driver-link {
@@ -493,8 +537,7 @@
         .notif-section {
             display: flex;
             flex-direction: column;
-            flex: 2;
-            /* takes remaining ~20% */
+            flex: 4;
             min-height: 0;
             overflow: hidden;
         }
@@ -588,7 +631,7 @@
             border-radius: 2px;
         }
 
-        /* ── SOP Sync Indicator ── */
+        /* ── SOP Sync Badge ── */
         .sop-sync-badge {
             display: flex;
             align-items: center;
@@ -634,10 +677,158 @@
             }
         }
 
-        /* ── Responsive ── */
-        @media (max-width: 900px) {
+        /* ── Mobile: floating "View Map" button ── */
+        .mobile-map-btn {
+            display: none;
+        }
+
+        /* ── Responsive Mobile Design ── */
+        @media (max-width: 768px) {
+            body {
+                overflow-y: auto;
+                height: auto;
+            }
+
+            .header {
+                flex-wrap: wrap;
+                gap: 12px;
+                padding: 12px 16px;
+            }
+
+            .header-left,
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            /* Stack metrics into a grid */
+            .metrics-bar {
+                flex-wrap: wrap;
+            }
+
+            .metric-card {
+                min-width: 50%;
+                flex: 1 1 50%;
+                border-bottom: 1px solid rgba(79, 195, 247, 0.06);
+            }
+
+            .metric-card:nth-child(even) {
+                border-right: none;
+            }
+
+            /* Stack main panels */
+            .content-row {
+                flex-direction: column;
+                overflow: visible;
+                display: block;
+            }
+
+            .left-panel,
             .right-panel {
+                width: 100%;
+                display: block;
+                height: auto;
+                overflow: visible;
+                border: none;
+            }
+
+            /* Allow internal scrolling for lists on mobile but keep them bounded */
+            .alerts-section,
+            .fleet-section,
+            .notif-section {
+                height: 400px;
+                border-bottom: 4px solid #000;
+            }
+
+            /* Hide Map Container off-screen instead of using display: none */
+            .map-container {
+                position: fixed;
+                left: -9999px;
+                top: 0;
+                width: 100vw;
+                height: 100vh;
+                visibility: hidden;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+            }
+
+            /* Map Open State */
+            body.mobile-map-open {
+                overflow: hidden;
+                height: 100vh;
+            }
+
+            body.mobile-map-open .map-container {
+                left: 0;
+                visibility: visible;
+                opacity: 1;
+                z-index: 2000;
+            }
+
+            /* Hide the side panels and headers, but keep content-row visible so the map shows */
+            body.mobile-map-open .header,
+            body.mobile-map-open .metrics-bar,
+            body.mobile-map-open .left-panel,
+            body.mobile-map-open .right-panel,
+            body.mobile-map-open .prediction-banner {
                 display: none;
+            }
+
+            /* Show Floating Map Button */
+            .mobile-map-btn {
+                display: block;
+                position: fixed;
+                bottom: 24px;
+                right: 24px;
+                z-index: 1500;
+                background: #4fc3f7;
+                color: #060b14;
+                border: none;
+                border-radius: 30px;
+                padding: 14px 20px;
+                font-size: 14px;
+                font-weight: 800;
+                cursor: pointer;
+                box-shadow: 0 4px 16px rgba(79, 195, 247, 0.4);
+                transition: transform 0.2s;
+            }
+
+            .mobile-map-btn:active {
+                transform: scale(0.95);
+            }
+
+            /* Hide open button when map is active */
+            body.mobile-map-open .mobile-map-btn {
+                display: none;
+            }
+
+            /* Floating Close Button for Map */
+            .map-close-btn {
+                display: flex;
+                position: absolute;
+                bottom: 30px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 2001;
+                background: #ff5252;
+                color: #ffffff;
+                border: none;
+                border-radius: 30px;
+                padding: 12px 24px;
+                font-size: 15px;
+                font-weight: 700;
+                box-shadow: 0 4px 16px rgba(255, 82, 82, 0.4);
+                cursor: pointer;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1100px) {
+            .left-panel {
+                width: 240px;
+            }
+
+            .right-panel {
+                width: 300px;
             }
 
             .metrics-bar {
@@ -645,14 +836,13 @@
             }
 
             .metric-card {
-                min-width: 33%;
+                min-width: 25%;
             }
         }
     </style>
 </head>
 
 <body>
-    <!-- ── Header ── -->
     <div class="header">
         <div class="header-left">
             <h1>🧊 LiveCold</h1>
@@ -680,10 +870,8 @@
         </div>
     </div>
 
-    <!-- ── Main wrapper (header excluded) ── -->
     <div class="main-wrapper">
 
-        <!-- Metrics Bar -->
         <div class="metrics-bar">
             <div class="metric-card mc-blue">
                 <div class="icon">🚚</div>
@@ -723,32 +911,19 @@
             </div>
         </div>
 
-        <!-- Prediction Banner
-             FIX #1: display:none is the only declaration; JS uses style.display='flex' to show it -->
         <div class="prediction-banner" id="predictionBanner">
             <span>🔮 Predictions:</span>
             <div id="predictionList"></div>
         </div>
 
-        <!-- Content Row: map + right panel -->
         <div class="content-row">
 
-            <!-- Map -->
-            <div class="map-container">
-                <div class="map-overlay">
-                    <div class="map-chip" id="hubChip">🏭 15 Hubs</div>
-                    <div class="map-chip" id="truckChip">🚚 0 Trucks</div>
-                </div>
-                <div id="map"></div>
-            </div>
-
-            <!-- Right Panel -->
-            <div class="right-panel">
-
-                <!-- Alerts section -->
+            <div class="left-panel">
                 <div class="alerts-section panel-section">
                     <div class="panel-header">
                         🚨 Alerts
+                        <input type="text" id="alert-search" class="panel-search" placeholder="Search ID..."
+                            onclick="event.stopPropagation()">
                         <span class="count" id="alert-count">0</span>
                     </div>
                     <div class="alerts-list" id="alerts-list">
@@ -757,11 +932,24 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Fleet section -->
+            <div class="map-container" id="mapContainer">
+                <div class="map-overlay">
+                    <div class="map-chip" id="hubChip">🏭 15 Hubs</div>
+                    <div class="map-chip" id="truckChip">🚚 0 Trucks</div>
+                </div>
+                <button class="map-close-btn" onclick="closeMobileMap()">❌ Close Map</button>
+                <div id="map"></div>
+            </div>
+
+            <div class="right-panel">
+
                 <div class="fleet-section panel-section">
                     <div class="panel-header">
                         🚚 Fleet
+                        <input type="text" id="fleet-search" class="panel-search" placeholder="Search ID..."
+                            onclick="event.stopPropagation()">
                         <span class="count" id="fleet-count">0</span>
                     </div>
                     <div class="shipment-list" id="shipment-list">
@@ -772,12 +960,12 @@
                     </div>
                 </div>
 
-                <!-- Notifications section -->
                 <div class="notif-section panel-section">
-                    <div class="panel-header" style="cursor:pointer" onclick="document.getElementById('notif-list').style.display =
-                                  document.getElementById('notif-list').style.display === 'none'
-                                  ? '' : 'none'">
+                    <div class="panel-header" style="cursor:pointer"
+                        onclick="document.getElementById('notif-list').style.display = document.getElementById('notif-list').style.display === 'none' ? '' : 'none'">
                         📲 Notifications
+                        <input type="text" id="notif-search" class="panel-search" placeholder="Search ID..."
+                            onclick="event.stopPropagation()">
                         <span class="count" id="notif-count">0 ▾</span>
                     </div>
                     <div class="notif-list" id="notif-list">
@@ -787,15 +975,43 @@
                     </div>
                 </div>
 
-            </div><!-- /right-panel -->
-        </div><!-- /content-row -->
-    </div><!-- /main-wrapper -->
+            </div>
+        </div>
+    </div>
+    <button class="mobile-map-btn" onclick="openMobileMap()">🗺️ View Map</button>
 
     <script>
-        // ── Map Setup ──
+        // Set up tracking for expanded states and button cooldowns
+        const expandedAlerts = new Set();
+        const expandedNotifs = new Set();
+        const sentCooldowns = new Set();
+
+        // ── Mobile map toggle ──
+        function openMobileMap() {
+            document.body.classList.add('mobile-map-open');
+            // Increased timeout so Leaflet computes sizing properly when container moves on-screen
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+        function closeMobileMap() {
+            document.body.classList.remove('mobile-map-open');
+        }
+
+        // ── Map Setup — Stacked Layers for customized colors ──
         const map = L.map('map').setView([22.5, 79.0], 5);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© CartoDB', maxZoom: 18
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB',
+            maxZoom: 19,
+            maxNativeZoom: 16,
+            className: 'base-map-grey'
+        }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            maxNativeZoom: 16,
+            className: 'green-labels'
         }).addTo(map);
 
         const markers = {};
@@ -822,14 +1038,204 @@
             });
         }
 
-        const style = document.createElement('style');
-        style.textContent = `
+        const _style = document.createElement('style');
+        _style.textContent = `
             @keyframes markerPulse {
                 0%, 100% { transform: scale(1); opacity: 1; }
                 50%       { transform: scale(1.6); opacity: 0.5; }
             }
+            .truck-arrow {
+                transition: transform 0.3s ease;
+            }
         `;
-        document.head.appendChild(style);
+        document.head.appendChild(_style);
+
+        // ── Directional Truck Icon (arrow showing heading) ──
+        function truckArrowIcon(risk, action, heading) {
+            const color = action === 'DIVERT' ? '#ff5252' :
+                risk > 0.5 ? '#ffb74d' : '#66bb6a';
+            const size = action === 'DIVERT' ? 22 : 18;
+            const pulse = action === 'DIVERT' ? 'animation: markerPulse 1.5s infinite;' : '';
+            const rotation = heading || 0;
+            return L.divIcon({
+                html: `<div class="truck-arrow" style="
+                    width:${size}px;height:${size}px;
+                    display:flex;align-items:center;justify-content:center;
+                    transform:rotate(${rotation}deg);
+                    ${pulse}
+                ">
+                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L4 20L12 16L20 20L12 2Z" fill="${color}" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                </div>`,
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size / 2],
+                className: ''
+            });
+        }
+
+        // ── Smooth Truck Tracker (Uber/Ola-style) ──
+        const GPS_INTERVAL = 2000; // Expected interval between GPS updates (ms)
+        const TRAIL_LENGTH = 20;   // Number of trail points per truck
+
+        class TruckTracker {
+            constructor() {
+                this.trucks = {};     // shipment_id -> truck animation state
+                this.trails = {};     // shipment_id -> L.polyline
+                this.trailPoints = {}; // shipment_id -> [{lat, lon}]
+                this.animationId = null;
+                this.running = false;
+            }
+
+            // Calculate bearing between two points (degrees, 0=North, CW)
+            calcHeading(fromLat, fromLon, toLat, toLon) {
+                const dLon = (toLon - fromLon) * Math.PI / 180;
+                const lat1 = fromLat * Math.PI / 180;
+                const lat2 = toLat * Math.PI / 180;
+                const y = Math.sin(dLon) * Math.cos(lat2);
+                const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                let bearing = Math.atan2(y, x) * 180 / Math.PI;
+                return (bearing + 360) % 360;
+            }
+
+            // Ease-out for natural deceleration
+            easeOut(t) {
+                return 1 - Math.pow(1 - Math.min(t, 1), 3);
+            }
+
+            // Linear interpolation
+            lerp(a, b, t) {
+                return a + (b - a) * t;
+            }
+
+            updateTruck(id, lat, lon, speed, risk, action, productType, origin, destination) {
+                if (!lat || !lon) return;
+
+                if (!this.trucks[id]) {
+                    // First time seeing this truck
+                    this.trucks[id] = {
+                        currentLat: lat, currentLon: lon,
+                        startLat: lat, startLon: lon,
+                        targetLat: lat, targetLon: lon,
+                        heading: 0,
+                        speed: speed || 50,
+                        risk: risk || 0.05,
+                        action: action || 'CONTINUE',
+                        productType: productType || '',
+                        origin: origin || '',
+                        destination: destination || '',
+                        animStart: performance.now(),
+                        animDuration: GPS_INTERVAL,
+                        lastUpdate: performance.now(),
+                    };
+                    this.trailPoints[id] = [{ lat, lon }];
+                    return;
+                }
+
+                const t = this.trucks[id];
+
+                // Calculate heading from current position to new target
+                const distMoved = Math.abs(lat - t.targetLat) + Math.abs(lon - t.targetLon);
+                if (distMoved > 0.0001) {
+                    t.heading = this.calcHeading(t.targetLat, t.targetLon, lat, lon);
+                }
+
+                // Snap current position to wherever animation has reached
+                t.startLat = t.currentLat;
+                t.startLon = t.currentLon;
+                t.targetLat = lat;
+                t.targetLon = lon;
+                t.speed = speed || t.speed;
+                t.risk = risk;
+                t.action = action;
+                t.productType = productType || t.productType;
+                t.origin = origin || t.origin;
+                t.destination = destination || t.destination;
+
+                // Latency compensation: if update is late, shorten animation
+                const timeSinceLast = performance.now() - t.lastUpdate;
+                if (timeSinceLast > GPS_INTERVAL * 1.5) {
+                    // Data arrived late — speed up to catch up
+                    t.animDuration = Math.max(500, GPS_INTERVAL - (timeSinceLast - GPS_INTERVAL));
+                } else {
+                    t.animDuration = GPS_INTERVAL;
+                }
+
+                t.animStart = performance.now();
+                t.lastUpdate = performance.now();
+
+                // Add to trail
+                if (!this.trailPoints[id]) this.trailPoints[id] = [];
+                this.trailPoints[id].push({ lat, lon });
+                if (this.trailPoints[id].length > TRAIL_LENGTH) {
+                    this.trailPoints[id].shift();
+                }
+                this.updateTrail(id);
+            }
+
+            updateTrail(id) {
+                const points = this.trailPoints[id];
+                if (!points || points.length < 2) return;
+
+                const latLngs = points.map(p => [p.lat, p.lon]);
+                const t = this.trucks[id];
+                const color = t.action === 'DIVERT' ? '#ff5252' :
+                    t.risk > 0.5 ? '#ffb74d' : 'rgba(102, 187, 106, 0.6)';
+
+                if (this.trails[id]) {
+                    this.trails[id].setLatLngs(latLngs);
+                    this.trails[id].setStyle({ color });
+                } else {
+                    this.trails[id] = L.polyline(latLngs, {
+                        color: color,
+                        weight: 2.5,
+                        opacity: 0.5,
+                        dashArray: '6 4',
+                        smoothFactor: 1,
+                    }).addTo(map);
+                }
+            }
+
+            // Main animation loop — runs at 60fps via requestAnimationFrame
+            animate(now) {
+                for (const [id, t] of Object.entries(this.trucks)) {
+                    const elapsed = now - t.animStart;
+                    const rawProgress = elapsed / t.animDuration;
+                    const progress = this.easeOut(rawProgress);
+
+                    // Interpolate position
+                    const lat = this.lerp(t.startLat, t.targetLat, progress);
+                    const lon = this.lerp(t.startLon, t.targetLon, progress);
+                    t.currentLat = lat;
+                    t.currentLon = lon;
+
+                    // Update Leaflet marker position (no DOM recreation)
+                    if (markers[id]) {
+                        markers[id].setLatLng([lat, lon]);
+                    }
+                }
+
+                if (this.running) {
+                    this.animationId = requestAnimationFrame(this.animate.bind(this));
+                }
+            }
+
+            start() {
+                if (this.running) return;
+                this.running = true;
+                this.animationId = requestAnimationFrame(this.animate.bind(this));
+            }
+
+            stop() {
+                this.running = false;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+            }
+        }
+
+        const tracker = new TruckTracker();
+        tracker.start();
 
         function hubIconFn(status) {
             const color = status === 'available' ? '#2e7d32' : '#e65100';
@@ -856,7 +1262,7 @@
                 hubs.forEach(h => {
                     const m = L.marker([h.lat, h.lon], { icon: hubIconFn(h.status) })
                         .addTo(map)
-                        .bindPopup(`<div style="font-family:Inter,system-ui;min-width:180px;font-size:12px">
+                        .bindPopup(`<div style="font-family:Inter,system-ui;min-width:180px;font-size:12px;color:#000;">
                             <b style="font-size:14px">${h.name}</b><br>
                             <span style="color:${h.status === 'available' ? '#66bb6a' : '#ff5252'}">${h.status.toUpperCase()}</span><br>
                             <hr style="border-color:#333;margin:4px 0">
@@ -871,21 +1277,33 @@
             }).catch(() => { });
         }
 
-        // ── Update Marker ──
+        // ── Update Marker (now feeds into smooth tracker) ──
         function updateMarker(s) {
             if (!s.lat || !s.lon) return;
-            const icon = truckIcon(s.risk_probability, s.recommended_action);
+
+            // Feed the tracker for smooth interpolation
+            tracker.updateTruck(
+                s.shipment_id, s.lat, s.lon,
+                s.speed_kmph, s.risk_probability, s.recommended_action,
+                s.product_type, s.origin, s.destination
+            );
+
+            // Get the truck state for heading-aware icon
+            const t = tracker.trucks[s.shipment_id];
+            const heading = t ? t.heading : 0;
+            const icon = truckArrowIcon(s.risk_probability, s.recommended_action, heading);
+
             const temp = s.temp != null ? s.temp.toFixed(1) + '°C' : 'N/A';
             const color = s.recommended_action === 'DIVERT' ? '#ff5252' :
                 s.risk_probability > 0.5 ? '#ffb74d' : '#66bb6a';
             const popup = `
-                <div style="font-family:Inter,system-ui;min-width:200px;font-size:13px;">
+                <div style="font-family:Inter,system-ui;min-width:200px;font-size:13px;color:#000;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <b style="font-size:15px">${s.shipment_id}</b>
                         <span style="background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${s.recommended_action}</span>
                     </div>
-                    <hr style="border-color:#333;margin:6px 0;">
-                    <div style="color:#aaa">${s.product_type} · ${s.cargo_value_inr ? '₹' + (s.cargo_value_inr / 100000).toFixed(1) + 'L' : ''}</div>
+                    <hr style="border-color:#ccc;margin:6px 0;">
+                    <div style="color:#555">${s.product_type} · ${s.cargo_value_inr ? '₹' + (s.cargo_value_inr / 100000).toFixed(1) + 'L' : ''}</div>
                     <div style="margin-top:4px">
                         🌡 <b>${temp}</b> <span style="color:#888">(${s.safe_min_temp}–${s.safe_max_temp}°C)</span><br>
                         ⚠️ Risk: <b style="color:${color}">${(s.risk_probability * 100).toFixed(0)}%</b><br>
@@ -894,14 +1312,14 @@
                     </div>
                     <div style="margin-top:6px;text-align:center">
                         <a href="/driver/${s.shipment_id}" target="_blank"
-                           style="color:#4fc3f7;font-size:11px;text-decoration:none">
-                           📱 Open Driver View →
+                           style="color:#0288d1;font-size:11px;text-decoration:none;font-weight:bold;">
+                            📱 Open Driver View →
                         </a>
                     </div>
                 </div>`;
 
             if (markers[s.shipment_id]) {
-                markers[s.shipment_id].setLatLng([s.lat, s.lon]);
+                // Don't setLatLng here — the animation loop handles position
                 markers[s.shipment_id].setIcon(icon);
                 markers[s.shipment_id].setPopupContent(popup);
             } else {
@@ -966,16 +1384,28 @@
         function updateShipmentList() {
             fetch('/api/shipments').then(r => r.json()).then(ships => {
                 const list = document.getElementById('shipment-list');
-                if (!ships.length) return;
-                document.getElementById('fleet-count').textContent = ships.length;
+                const q = document.getElementById('fleet-search').value.toLowerCase();
 
-                ships.sort((a, b) => {
+                let filteredShips = ships;
+                if (q) {
+                    filteredShips = ships.filter(s => String(s.shipment_id).toLowerCase().includes(q));
+                }
+
+                if (!filteredShips.length) {
+                    list.innerHTML = `<div class="shipment-item" style="color:#4a5d73;grid-template-columns:1fr;text-align:center;padding:30px;">No matching data...</div>`;
+                    document.getElementById('fleet-count').textContent = 0;
+                    return;
+                }
+
+                document.getElementById('fleet-count').textContent = filteredShips.length;
+
+                filteredShips.sort((a, b) => {
                     if (a.recommended_action === 'DIVERT' && b.recommended_action !== 'DIVERT') return -1;
                     if (b.recommended_action === 'DIVERT' && a.recommended_action !== 'DIVERT') return 1;
                     return b.risk_probability - a.risk_probability;
                 });
 
-                list.innerHTML = ships.map(s => {
+                list.innerHTML = filteredShips.map(s => {
                     const temp = s.temp != null ? s.temp.toFixed(1) : '--';
                     let tc = 'safe';
                     if (s.temp != null) {
@@ -988,7 +1418,6 @@
                     const rmIcon = rm === 'SAFETY' ? '🛡️' : rm === 'ECO' ? '🌱' : '⚖️';
                     const rmColor = rm === 'SAFETY' ? '#ff5252' : rm === 'ECO' ? '#66bb6a' : '#4fc3f7';
 
-                    // FIX #9: use data-sid attribute; avoid raw string interpolation in onclick
                     return `<div class="shipment-item" data-lat="${s.lat || 22}" data-lon="${s.lon || 79}">
                         <div class="sid">${s.shipment_id}</div>
                         <div class="route">${s.product_type}<br>${s.origin}→${s.destination}</div>
@@ -1003,12 +1432,17 @@
                     </div>`;
                 }).join('');
 
-                // Attach row click (pan map) and routing-mode toggle safely
                 list.querySelectorAll('.shipment-item').forEach(row => {
                     row.addEventListener('click', () => {
                         map.setView([parseFloat(row.dataset.lat), parseFloat(row.dataset.lon)], 8);
+
+                        // If on mobile, automatically open map when clicking a shipment
+                        if (window.innerWidth <= 768) {
+                            openMobileMap();
+                        }
                     });
                 });
+
                 list.querySelectorAll('.rm-toggle').forEach(btn => {
                     btn.addEventListener('click', e => {
                         e.stopPropagation();
@@ -1016,6 +1450,7 @@
                     });
                 });
 
+                // Always update markers for the entire fleet, regardless of active search term
                 ships.forEach(updateMarker);
             }).catch(() => { });
         }
@@ -1024,10 +1459,23 @@
         function updateAlerts() {
             fetch('/api/alerts').then(r => r.json()).then(alertList => {
                 const list = document.getElementById('alerts-list');
-                if (!alertList.length) return;
-                document.getElementById('alert-count').textContent = alertList.length;
+                const q = document.getElementById('alert-search').value.toLowerCase();
 
-                const recent = [...alertList].reverse().slice(0, 30);
+                let filteredAlerts = alertList;
+                if (q) {
+                    filteredAlerts = alertList.filter(a => String(a.shipment_id).toLowerCase().includes(q));
+                }
+
+                if (!filteredAlerts.length) {
+                    list.innerHTML = `<div class="alert-item" style="color:#4a5d73;text-align:center;padding:30px;">No matching alerts...</div>`;
+                    document.getElementById('alert-count').textContent = 0;
+                    return;
+                }
+
+                document.getElementById('alert-count').textContent = filteredAlerts.length;
+
+                const recent = [...filteredAlerts].reverse().slice(0, 30);
+
                 list.innerHTML = recent.map(a => {
                     const isDivert = a.action === 'DIVERT';
                     const isDoor = a.action && a.action.includes('DOOR');
@@ -1035,11 +1483,17 @@
                     const badgeCls = isDivert ? 'divert' : isDoor ? 'door' : 'continue';
                     const time = a.timestamp ? a.timestamp.split('T')[1]?.substring(0, 8) : '';
                     const hasSOP = a.sop_recommendation && a.sop_recommendation.length > 10;
+
+                    // Identify alert uniquely using action instead of timestamp to prevent collapse on update
+                    const alertKey = `${a.shipment_id}_${a.action}`;
+                    const wasOpen = expandedAlerts.has(alertKey);
+
                     const sop = hasSOP ? `
-                        <div class="sop-toggle">📋 View SOP Recommendation ▾</div>
+                        <div class="sop-toggle" data-akey="${alertKey}">📋 SOP Recommendation ▾</div>
                         <div class="sop-rec">${a.sop_recommendation}</div>
                     ` : '';
-                    return `<div class="alert-item ${cls}">
+
+                    return `<div class="alert-item ${cls}${wasOpen ? ' expanded' : ''}" data-akey="${alertKey}">
                         <div class="alert-top">
                             <span class="alert-id">${a.shipment_id}</span>
                             <span class="alert-badge ${badgeCls}">${a.action}</span>
@@ -1051,15 +1505,34 @@
                     </div>`;
                 }).join('');
 
-                // FIX #9: attach SOP toggle via JS instead of inline onclick
                 list.querySelectorAll('.sop-toggle').forEach(btn => {
-                    btn.addEventListener('click', () => btn.parentElement.classList.toggle('expanded'));
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        const item = btn.closest('.alert-item');
+                        const key = item.dataset.akey;
+                        if (item.classList.toggle('expanded')) {
+                            expandedAlerts.add(key);
+                        } else {
+                            expandedAlerts.delete(key);
+                        }
+                    });
                 });
+
+                list.querySelectorAll('.alert-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const key = item.dataset.akey;
+                        if (item.classList.toggle('expanded')) {
+                            expandedAlerts.add(key);
+                        } else {
+                            expandedAlerts.delete(key);
+                        }
+                    });
+                });
+
             }).catch(() => { });
         }
 
         // ── Predictions ──
-        // FIX #8: fetch all histories in parallel with Promise.all instead of sequential await
         async function updatePredictions() {
             try {
                 const ships = await fetch('/api/shipments').then(r => r.json());
@@ -1092,8 +1565,8 @@
 
                 const banner = document.getElementById('predictionBanner');
                 const plist = document.getElementById('predictionList');
+
                 if (predictions.length > 0) {
-                    // FIX #1: set display to 'flex' (the correct value for this flex container)
                     banner.style.display = 'flex';
                     plist.innerHTML = predictions.map(p =>
                         `<span class="pred-item">⚠️ ${p.id}: ${p.current}°C → ${p.predicted}°C in 30min (limit: ${p.threshold}°C)</span>`
@@ -1110,8 +1583,10 @@
             const icons = { SAFETY: '🛡️', BALANCED: '⚖️', ECO: '🌱' };
             const el = document.getElementById('rm-' + shipmentId);
             if (!el) return;
+
             const current = el.title || 'BALANCED';
             const next = modes[(modes.indexOf(current) + 1) % 3];
+
             fetch(`/api/routing-mode/${shipmentId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1128,18 +1603,16 @@
                 new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        // ── SSE ──
-        // FIX #7: added onerror handler with exponential back-off reconnect
+        // ── SSE (keeps alerts, notifications, SOP updates working) ──
         let sseRetryDelay = 2000;
         function connectSSE() {
             const evtSource = new EventSource('/api/stream');
             evtSource.onmessage = e => {
-                sseRetryDelay = 2000; // reset on success
+                sseRetryDelay = 2000;
                 try {
                     const msg = JSON.parse(e.data);
                     if (msg.type === 'update') updateMarker(msg.data);
                     if (msg.type === 'sop_update') {
-                        // Instant flash when SOP changes
                         const badge = document.getElementById('sopSyncBadge');
                         badge.classList.add('updating');
                         document.getElementById('sopSyncText').textContent = 'SOP updating...';
@@ -1161,20 +1634,67 @@
         }
         connectSSE();
 
+        // ── Socket.IO (real-time GPS for smooth tracking) ──
+        let socketRetryDelay = 2000;
+        function connectSocketIO() {
+            const socket = io({ transports: ['websocket', 'polling'] });
+
+            socket.on('connect', () => {
+                console.log('🔌 Socket.IO connected — real-time GPS active');
+                socketRetryDelay = 2000;
+            });
+
+            socket.on('gps_update', (data) => {
+                // Feed GPS data into the smooth tracker
+                tracker.updateTruck(
+                    data.shipment_id,
+                    data.lat, data.lon,
+                    data.speed_kmph,
+                    data.risk_probability,
+                    data.recommended_action,
+                    data.product_type,
+                    data.origin,
+                    data.destination
+                );
+
+                // Also update the marker icon/popup with latest data
+                updateMarker(data);
+            });
+
+            socket.on('disconnect', () => {
+                console.warn('🔌 Socket.IO disconnected');
+            });
+
+            socket.on('connect_error', (err) => {
+                console.warn(`Socket.IO error: ${err.message}`);
+            });
+        }
+        connectSocketIO();
+
         // ── Notifications ──
         function updateNotifications() {
             fetch('/api/notifications').then(r => r.json()).then(notifs => {
                 const list = document.getElementById('notif-list');
-                if (!notifs || !notifs.length) return;
+                const q = document.getElementById('notif-search').value.toLowerCase();
 
-                // Deduplicate: keep only latest notification per shipment_id + type
+                let filteredNotifs = notifs;
+                if (q) {
+                    filteredNotifs = notifs.filter(n => String(n.shipment_id).toLowerCase().includes(q));
+                }
+
+                if (!filteredNotifs || !filteredNotifs.length) {
+                    list.innerHTML = `<div style="color:#4a5d73;text-align:center;padding:20px;font-size:11px">No matching notifications...</div>`;
+                    document.getElementById('notif-count').textContent = '0 ▾';
+                    return;
+                }
+
                 const seen = new Map();
-                [...notifs].reverse().forEach(n => {
+                [...filteredNotifs].reverse().forEach(n => {
                     const key = `${n.shipment_id}_${n.type}`;
                     if (!seen.has(key)) seen.set(key, n);
                 });
                 const deduped = [...seen.values()];
-                document.getElementById('notif-count').textContent = deduped.length;
+                document.getElementById('notif-count').textContent = `${deduped.length} ▾`;
 
                 list.innerHTML = deduped.slice(0, 30).map((n, i) => {
                     const isWA = n.channel === 'whatsapp';
@@ -1187,12 +1707,20 @@
                     const label = isDivert ? 'DIVERT' : isRepair ? 'REPAIR' : 'DELIVERED';
                     const recipient = n.recipient || '';
                     const time = n.timestamp ? n.timestamp.split('T')[1]?.substring(0, 8) : '';
-                    const sent = !!n.sent_to_driver;
-                    const sendLabel = isDelivery ? 'Send Email' : 'Send WhatsApp';
-                    const sendBtnId = `send-btn-${i}`;
                     const preview = (n.message || '').split('\n')[0].substring(0, 50);
 
-                    return `<div class="notif-item ${cls}" id="notif-${i}">
+                    // Identify notif uniquely to retain expand state
+                    const notifKey = `${n.shipment_id}_${n.type}`;
+                    const wasOpen = expandedNotifs.has(notifKey);
+
+                    // Track cooldown state to reset button
+                    const inCooldown = sentCooldowns.has(notifKey);
+                    const sent = inCooldown;
+
+                    const sendLabel = isDelivery ? 'Send Email' : 'Send WhatsApp';
+                    const sendBtnId = `send-btn-${i}`;
+
+                    return `<div class="notif-item ${cls} ${wasOpen ? 'expanded' : ''}" id="notif-${i}" data-nkey="${notifKey}">
                         <div class="notif-top">
                             <span style="font-weight:700;color:#e0e6f0">${icon} ${n.shipment_id} — ${label}</span>
                             <span class="notif-channel ${channelCls}">${isWA ? '📱 WhatsApp' : '📧 Email'}</span>
@@ -1206,7 +1734,7 @@
                                     data-type="${n.type}"
                                     class="send-notif-btn"
                                     style="background:${sent ? '#1e3050' : (isDelivery ? '#4fc3f7' : '#25D366')};
-                                           color:${sent ? '#5a6f85' : '#fff'};
+                                           color:${sent ? '#5a6f85' : '#000'};
                                            border:none;border-radius:6px;padding:4px 10px;font-size:10px;
                                            font-weight:700;cursor:${sent ? 'default' : 'pointer'};transition:all 0.3s"
                                     ${sent ? 'disabled' : ''}>
@@ -1220,16 +1748,22 @@
                     </div>`;
                 }).join('');
 
-                // FIX #9: event delegation for send + expand — no inline onclick strings
                 list.querySelectorAll('.send-notif-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         if (btn.disabled) return;
                         sendNotification(btn.dataset.sid, btn.dataset.type, btn.id);
                     });
                 });
+
                 list.querySelectorAll('.notif-expand').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        document.getElementById(btn.dataset.target)?.classList.toggle('expanded');
+                        const item = document.getElementById(btn.dataset.target);
+                        const nkey = item.dataset.nkey;
+                        if (item.classList.toggle('expanded')) {
+                            expandedNotifs.add(nkey);
+                        } else {
+                            expandedNotifs.delete(nkey);
+                        }
                     });
                 });
             }).catch(() => { });
@@ -1239,9 +1773,13 @@
         function sendNotification(shipmentId, notifType, btnId) {
             const btn = document.getElementById(btnId);
             if (!btn || btn.disabled) return;
+
+            // Mark button as sent
             btn.textContent = 'Sending...';
             btn.style.background = '#1e3050';
             btn.disabled = true;
+
+            const notifKey = `${shipmentId}_${notifType}`;
 
             fetch('/api/push-notification-to-driver', {
                 method: 'POST',
@@ -1250,12 +1788,25 @@
             }).then(r => r.json()).then(() => {
                 btn.textContent = '✓ Sent to Driver';
                 btn.style.color = '#66bb6a';
+
+                // Track cooldown to reset button after 3 seconds
+                sentCooldowns.add(notifKey);
+                setTimeout(() => {
+                    sentCooldowns.delete(notifKey);
+                    updateNotifications(); // Force redraw to reset button styling
+                }, 3000);
+
             }).catch(() => {
                 btn.textContent = '✗ Failed';
                 btn.style.background = '#ff5252';
                 btn.disabled = false;
             });
         }
+
+        // Apply search input event listeners so users can type and see results immediately
+        document.getElementById('alert-search').addEventListener('input', updateAlerts);
+        document.getElementById('fleet-search').addEventListener('input', updateShipmentList);
+        document.getElementById('notif-search').addEventListener('input', updateNotifications);
 
         // ── Polling ──
         setInterval(updateMetrics, 2000);
@@ -1285,7 +1836,6 @@
                 const agoStr = ago < 5 ? 'just now' : ago < 60 ? ago + 's ago' : Math.floor(ago / 60) + 'm ago';
 
                 if (data.change_count > lastSopChangeCount && lastSopChangeCount > 0) {
-                    // New change detected!
                     badge.classList.add('updating');
                     text.textContent = 'SOP updated! ' + agoStr;
                     setTimeout(() => badge.classList.remove('updating'), 3000);

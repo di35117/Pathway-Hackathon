@@ -1,5 +1,6 @@
 # Requirements for LiveCold (Pathway + Demo)
 flask
+flask-socketio
 paho-mqtt
 litellm
 python-dotenv

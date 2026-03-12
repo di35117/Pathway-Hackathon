@@ -9,6 +9,7 @@ import threading
 import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, Response, request
+from flask_socketio import SocketIO
 import paho.mqtt.client as mqtt
 import queue
 import time
@@ -25,6 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("dashboard")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ── Global State ────────────────────────────────────────────────
 shipments = {}      # shipment_id -> latest state
@@ -39,7 +41,20 @@ metrics = {
     "high_risk_events": 0,
     "anomalies_filtered": 0,
 }
-sse_queue = queue.Queue(maxsize=500)
+sse_clients = set()  # per-client queues for SSE broadcast
+sse_clients_lock = threading.Lock()
+
+def broadcast_sse(data_str):
+    """Push an SSE event to ALL connected dashboard clients."""
+    with sse_clients_lock:
+        dead = []
+        for q in sse_clients:
+            try:
+                q.put_nowait(data_str)
+            except queue.Full:
+                dead.append(q)
+        for q in dead:
+            sse_clients.discard(q)
 
 # ── Per-Shipment Routing Mode ───────────────────────────────────
 # SAFETY  = nearest hub always, ignore cost (vaccines, pharma)
@@ -124,7 +139,7 @@ def _sop_file_watcher():
                 log.info(f"🔄 SOP updated! Reloaded {len(new_content)} chars, cache cleared (change #{sop_sync_status['change_count']})")
                 # Push SSE event to dashboard
                 try:
-                    sse_queue.put_nowait(json.dumps({
+                    broadcast_sse(json.dumps({
                         "type": "sop_update",
                         "data": {
                             "last_modified": sop_sync_status["last_modified"],
@@ -132,7 +147,7 @@ def _sop_file_watcher():
                             "change_count": sop_sync_status["change_count"],
                         }
                     }))
-                except queue.Full:
+                except Exception:
                     pass
         except Exception as e:
             log.warning(f"SOP watcher error: {e}")
@@ -263,8 +278,8 @@ def on_message(client, userdata, msg):
             alert_notifier._store_notification(notification)
             log.info(f"📲 Notification received: [{notification.get('type')}] {notification.get('shipment_id')}")
             try:
-                sse_queue.put_nowait(json.dumps({"type": "notification", "data": notification}))
-            except queue.Full:
+                broadcast_sse(json.dumps({"type": "notification", "data": notification}))
+            except Exception:
                 pass
         except Exception:
             pass
@@ -410,8 +425,8 @@ def on_message(client, userdata, msg):
                 alerts.pop(0)
 
             try:
-                sse_queue.put_nowait(json.dumps({"type": "alert", "data": alert}))
-            except queue.Full:
+                broadcast_sse(json.dumps({"type": "alert", "data": alert}))
+            except Exception:
                 pass
 
     elif topic == "livecold/gps":
@@ -420,6 +435,23 @@ def on_message(client, userdata, msg):
         s["speed_kmph"] = data.get("speed_kmph", 0)
         s["origin"] = data.get("origin", s["origin"])
         s["destination"] = data.get("destination", s["destination"])
+
+        # Emit GPS update via Socket.IO for smooth real-time tracking
+        try:
+            socketio.emit('gps_update', {
+                'shipment_id': shipment_id,
+                'lat': s['lat'],
+                'lon': s['lon'],
+                'speed_kmph': s['speed_kmph'],
+                'risk_probability': s.get('risk_probability', 0.05),
+                'recommended_action': s.get('recommended_action', 'CONTINUE'),
+                'product_type': s.get('product_type', ''),
+                'origin': s.get('origin', ''),
+                'destination': s.get('destination', ''),
+                'timestamp': s['last_update'],
+            })
+        except Exception:
+            pass
 
     elif topic == "livecold/reefer":
         s["compressor_status"] = data.get("compressor_status", "ON")
@@ -454,8 +486,8 @@ def on_message(client, userdata, msg):
 
     # Push state update via SSE
     try:
-        sse_queue.put_nowait(json.dumps({"type": "update", "data": s}))
-    except queue.Full:
+        broadcast_sse(json.dumps({"type": "update", "data": s}))
+    except Exception:
         pass
 
 
@@ -470,6 +502,16 @@ def start_mqtt():
         mqtt_client.loop_forever()
     except Exception as e:
         log.error(f"MQTT connection failed: {e}")
+
+
+# ── Socket.IO Event Handlers ───────────────────────────────────
+@socketio.on('connect')
+def handle_connect():
+    log.info("🔌 Socket.IO client connected")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    log.info("🔌 Socket.IO client disconnected")
 
 
 # ── Flask Routes ────────────────────────────────────────────────
@@ -643,14 +685,21 @@ def api_anomalies():
 
 @app.route("/api/stream")
 def api_stream():
-    """Server-Sent Events for real-time updates"""
+    """Server-Sent Events for real-time updates — per-client queue for multi-user support."""
+    client_queue = queue.Queue(maxsize=500)
+    with sse_clients_lock:
+        sse_clients.add(client_queue)
     def generate():
-        while True:
-            try:
-                data = sse_queue.get(timeout=5)
-                yield f"data: {data}\n\n"
-            except queue.Empty:
-                yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+        try:
+            while True:
+                try:
+                    data = client_queue.get(timeout=5)
+                    yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+        finally:
+            with sse_clients_lock:
+                sse_clients.discard(client_queue)
     return Response(generate(), mimetype="text/event-stream")
 
 
@@ -929,7 +978,7 @@ def api_save_sop_content():
         log.info(f"📝 SOP saved via editor ({len(content)} chars), cache cleared")
         # Push SSE
         try:
-            sse_queue.put_nowait(json.dumps({
+            broadcast_sse(json.dumps({
                 "type": "sop_update",
                 "data": {
                     "last_modified": sop_sync_status["last_modified"],
@@ -937,7 +986,7 @@ def api_save_sop_content():
                     "change_count": sop_sync_status["change_count"],
                 }
             }))
-        except queue.Full:
+        except Exception:
             pass
         return jsonify({
             "status": "saved",
@@ -1053,7 +1102,7 @@ def main():
     print("📡 MQTT: localhost:1883")
     print("=" * 60 + "\n")
 
-    app.run(host="0.0.0.0", port=5050, debug=False)
+    socketio.run(app, host="0.0.0.0", port=5050, debug=False, allow_unsafe_werkzeug=True)
 
 
 if __name__ == "__main__":

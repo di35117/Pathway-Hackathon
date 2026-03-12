@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveCold — Business Models & Pricing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #060b14;
+            color: #e0e6f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #080e1e 0%, #0e1a33 100%);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(79, 195, 247, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #4fc3f7, #00e5ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-nav a {
+            color: #6b7d94;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .header-nav a:hover,
+        .header-nav a.active {
+            color: #4fc3f7;
+        }
+
+        /* ── Hero Section ── */
+        .hero {
+            text-align: center;
+            padding: 80px 32px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(79, 195, 247, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(79, 195, 247, 0.08);
+            border: 1px solid rgba(79, 195, 247, 0.2);
+            padding: 6px 16px;
+            border-radius: 24px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4fc3f7;
+            margin-bottom: 24px;
+            letter-spacing: 0.5px;
+        }
+
+        .hero h2 {
+            font-size: 48px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            letter-spacing: -1.5px;
+        }
+
+        .hero h2 span {
+            background: linear-gradient(135deg, #4fc3f7, #00e5ff, #66bb6a);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: #5a6f85;
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* ── Section Title ── */
+        .section-title {
+            text-align: center;
+            padding: 60px 32px 32px;
+        }
+
+        .section-title h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #4fc3f7;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .section-title h2 {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .section-title p {
+            color: #5a6f85;
+            font-size: 15px;
+            margin-top: 8px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ── Business Model Cards ── */
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 32px 60px;
+        }
+
+        .model-card {
+            background: linear-gradient(160deg, #0f1628 0%, #0a1020 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            padding: 36px 28px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .model-card:hover {
+            border-color: rgba(79, 195, 247, 0.25);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .model-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .model-card.saas::before {
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+        }
+
+        .model-card.savings::before {
+            background: linear-gradient(90deg, #66bb6a, #43a047);
+        }
+
+        .model-card.carbon::before {
+            background: linear-gradient(90deg, #ce93d8, #ab47bc);
+        }
+
+        .model-number {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .model-card.saas .model-number {
+            color: #4fc3f7;
+        }
+
+        .model-card.savings .model-number {
+            color: #66bb6a;
+        }
+
+        .model-card.carbon .model-number {
+            color: #ce93d8;
+        }
+
+        .model-card h3 {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .model-type-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .model-card.saas .model-type-badge {
+            background: rgba(79, 195, 247, 0.1);
+            color: #4fc3f7;
+        }
+
+        .model-card.savings .model-type-badge {
+            background: rgba(102, 187, 106, 0.1);
+            color: #66bb6a;
+        }
+
+        .model-card.carbon .model-type-badge {
+            background: rgba(206, 147, 216, 0.1);
+            color: #ce93d8;
+        }
+
+        .model-desc {
+            font-size: 14px;
+            color: #7a8ea0;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .model-tagline {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .model-card.saas .model-tagline {
+            color: #4fc3f7;
+        }
+
+        .model-card.savings .model-tagline {
+            color: #66bb6a;
+        }
+
+        .model-card.carbon .model-tagline {
+            color: #ce93d8;
+        }
+
+        .model-icon {
+            font-size: 36px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        /* ── Pricing Tiers ── */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+        }
+
+        .pricing-card {
+            background: linear-gradient(160deg, #0f1628 0%, #0a1020 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            padding: 36px 28px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .pricing-card.featured {
+            border-color: rgba(79, 195, 247, 0.3);
+            background: linear-gradient(160deg, #101e38 0%, #0c1428 100%);
+        }
+
+        .pricing-card.featured::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #4fc3f7, #00e5ff, #66bb6a);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: linear-gradient(135deg, #4fc3f7, #00e5ff);
+            color: #060b14;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .tier-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #5a6f85;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .tier-price {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .tier-price .currency {
+            font-size: 24px;
+            font-weight: 700;
+            vertical-align: super;
+            letter-spacing: 0;
+        }
+
+        .tier-price .period {
+            font-size: 16px;
+            font-weight: 500;
+            color: #5a6f85;
+            letter-spacing: 0;
+        }
+
+        .tier-subtitle {
+            font-size: 13px;
+            color: #5a6f85;
+            margin-bottom: 24px;
+        }
+
+        .tier-features {
+            list-style: none;
+            margin-bottom: 32px;
+            flex: 1;
+        }
+
+        .tier-features li {
+            font-size: 13px;
+            color: #8899aa;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+        }
+
+        .tier-features li::before {
+            content: '✓';
+            color: #66bb6a;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .tier-features li.disabled {
+            color: #3a4560;
+        }
+
+        .tier-features li.disabled::before {
+            content: '—';
+            color: #3a4560;
+        }
+
+        .tier-cta {
+            display: block;
+            width: 100%;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+            letter-spacing: 0.5px;
+        }
+
+        .tier-cta.primary {
+            background: linear-gradient(135deg, #4fc3f7, #00e5ff);
+            color: #060b14;
+            box-shadow: 0 4px 20px rgba(79, 195, 247, 0.3);
+        }
+
+        .tier-cta.primary:hover {
+            box-shadow: 0 8px 30px rgba(79, 195, 247, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .tier-cta.secondary {
+            background: rgba(79, 195, 247, 0.08);
+            color: #4fc3f7;
+            border: 1px solid rgba(79, 195, 247, 0.2);
+        }
+
+        .tier-cta.secondary:hover {
+            background: rgba(79, 195, 247, 0.15);
+            border-color: rgba(79, 195, 247, 0.4);
+        }
+
+        /* ── Value Metrics ── */
+        .value-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            max-width: 1200px;
+            margin: 0 auto 60px;
+            background: linear-gradient(160deg, #0f1628 0%, #0a1020 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .value-item {
+            padding: 32px 24px;
+            text-align: center;
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
+            transition: background 0.3s;
+        }
+
+        .value-item:last-child {
+            border-right: none;
+        }
+
+        .value-item:hover {
+            background: rgba(79, 195, 247, 0.03);
+        }
+
+        .value-item .icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .value-item .number {
+            font-size: 32px;
+            font-weight: 900;
+            color: #4fc3f7;
+            letter-spacing: -1px;
+        }
+
+        .value-item .desc {
+            font-size: 12px;
+            color: #5a6f85;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        /* ── FAQ Section ── */
+        .faq-section {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 20px 0;
+        }
+
+        .faq-q {
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: color 0.2s;
+        }
+
+        .faq-q:hover {
+            color: #4fc3f7;
+        }
+
+        .faq-q .arrow {
+            transition: transform 0.3s;
+            font-size: 18px;
+            color: #4fc3f7;
+        }
+
+        .faq-a {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, padding 0.3s;
+            font-size: 14px;
+            color: #7a8ea0;
+            line-height: 1.7;
+        }
+
+        .faq-item.open .faq-a {
+            max-height: 200px;
+            padding-top: 12px;
+        }
+
+        .faq-item.open .faq-q .arrow {
+            transform: rotate(180deg);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 40px 32px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            color: #3a4560;
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: #4fc3f7;
+            text-decoration: none;
+        }
+
+        /* ── Responsive: Tablet (≤1024px) ── */
+        @media (max-width: 1024px) {
+            .models-grid {
+                grid-template-columns: 1fr;
+                max-width: 500px;
+            }
+
+            /* Horizontal scroll for pricing cards on tablet */
+            .pricing-grid {
+                grid-template-columns: repeat(3, minmax(280px, 1fr));
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x mandatory;
+                padding-bottom: 16px;
+                gap: 16px;
+            }
+
+            .pricing-card {
+                scroll-snap-align: center;
+                min-width: 280px;
+            }
+
+            .value-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .value-item:nth-child(2) {
+                border-right: none;
+            }
+
+            .hero h2 {
+                font-size: 36px;
+            }
+
+            .section-title {
+                padding: 40px 24px 24px;
+            }
+        }
+
+        /* ── Responsive: Mobile (≤768px) ── */
+        @media (max-width: 768px) {
+            body {
+                padding-bottom: env(safe-area-inset-bottom, 0);
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                padding: 14px 16px;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+            }
+
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .header-nav {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .header-nav a {
+                font-size: 12px;
+                padding: 6px 10px;
+                background: rgba(255, 255, 255, 0.04);
+                border-radius: 8px;
+                /* Ensure minimum 44px touch target height */
+                min-height: 36px;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .hero {
+                padding: 40px 16px 24px;
+            }
+
+            .hero::before {
+                width: 400px;
+                height: 400px;
+            }
+
+            .hero-badge {
+                font-size: 11px;
+                padding: 5px 12px;
+                margin-bottom: 16px;
+            }
+
+            .hero h2 {
+                font-size: 26px;
+                letter-spacing: -1px;
+            }
+
+            .hero p {
+                font-size: 14px;
+                line-height: 1.5;
+                padding: 0 8px;
+            }
+
+            /* Stack model cards vertically */
+            .models-grid {
+                grid-template-columns: 1fr;
+                max-width: 100%;
+                padding: 0 16px 32px;
+                gap: 16px;
+            }
+
+            .model-card {
+                padding: 24px 20px;
+                border-radius: 16px;
+            }
+
+            .model-card:hover {
+                transform: none; /* Disable hover lift on touch */
+            }
+
+            .model-icon {
+                font-size: 28px;
+                margin-bottom: 12px;
+            }
+
+            .model-card h3 {
+                font-size: 19px;
+            }
+
+            .model-desc {
+                font-size: 13px;
+            }
+
+            /* Horizontal swipe for pricing on mobile */
+            .pricing-grid {
+                grid-template-columns: repeat(3, 85vw);
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x mandatory;
+                scroll-padding: 0 16px;
+                padding: 0 16px 32px;
+                gap: 12px;
+                max-width: 100vw;
+            }
+
+            .pricing-card {
+                scroll-snap-align: start;
+                min-width: 0;
+                padding: 24px 20px;
+                border-radius: 16px;
+            }
+
+            .pricing-card:hover {
+                transform: none;
+            }
+
+            .popular-badge {
+                top: 12px;
+                right: 12px;
+                font-size: 9px;
+                padding: 3px 10px;
+            }
+
+            .tier-name {
+                font-size: 13px;
+            }
+
+            .tier-price {
+                font-size: 36px;
+            }
+
+            .tier-price .currency {
+                font-size: 20px;
+            }
+
+            .tier-price .period {
+                font-size: 14px;
+            }
+
+            .tier-subtitle {
+                font-size: 12px;
+                margin-bottom: 20px;
+            }
+
+            .tier-features li {
+                font-size: 12px;
+                padding: 7px 0;
+                gap: 8px;
+            }
+
+            .tier-cta {
+                padding: 14px 20px;
+                font-size: 14px;
+                /* Touch-friendly size */
+                min-height: 48px;
+                border-radius: 12px;
+            }
+
+            /* Value strip stacks on mobile */
+            .value-strip {
+                grid-template-columns: repeat(2, 1fr) !important;
+                margin: 0 16px 32px !important;
+                border-radius: 16px;
+            }
+
+            .value-item {
+                padding: 20px 16px;
+                border-right: 1px solid rgba(255, 255, 255, 0.04);
+            }
+
+            .value-item:nth-child(2),
+            .value-item:nth-child(4) {
+                border-right: none;
+            }
+
+            .value-item:nth-child(1),
+            .value-item:nth-child(2) {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            }
+
+            .value-item .icon {
+                font-size: 22px;
+                margin-bottom: 4px;
+            }
+
+            .value-item .number {
+                font-size: 24px !important;
+            }
+
+            .value-item .desc {
+                font-size: 10px;
+                letter-spacing: 0.5px;
+            }
+
+            /* Section titles */
+            .section-title {
+                padding: 32px 16px 20px;
+            }
+
+            .section-title h3 {
+                font-size: 11px;
+                letter-spacing: 2px;
+            }
+
+            .section-title h2 {
+                font-size: 24px;
+            }
+
+            .section-title p {
+                font-size: 13px;
+            }
+
+            /* FAQ */
+            .faq-section {
+                padding: 0 16px 48px;
+            }
+
+            .faq-q {
+                font-size: 14px;
+                padding: 4px 0;
+                /* Touch target */
+                min-height: 44px;
+            }
+
+            .faq-a {
+                font-size: 13px;
+            }
+
+            .faq-item.open .faq-a {
+                max-height: 300px;
+            }
+
+            /* Footer */
+            .footer {
+                padding: 32px 16px;
+                font-size: 11px;
+            }
+
+            /* Disable scroll-snap on pricing grid for mobile (scrollbar hint) */
+            .pricing-grid::after {
+                content: '';
+                min-width: 1px;
+            }
+        }
+
+        /* ── Responsive: Small Phone (≤480px) ── */
+        @media (max-width: 480px) {
+            .hero h2 {
+                font-size: 22px;
+            }
+
+            .hero p {
+                font-size: 13px;
+            }
+
+            .pricing-grid {
+                grid-template-columns: repeat(3, 88vw);
+            }
+
+            .value-strip {
+                grid-template-columns: 1fr !important;
+            }
+
+            .value-item {
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                padding: 16px;
+            }
+
+            .value-item:last-child {
+                border-bottom: none;
+            }
+
+            .model-card h3 {
+                font-size: 17px;
+            }
+
+            .tier-price {
+                font-size: 32px;
+            }
+
+            .header-nav a {
+                font-size: 11px;
+                padding: 5px 8px;
+            }
+        }
+
+        /* ── Scrollbar styling for horizontal scroll areas ── */
+        .pricing-grid::-webkit-scrollbar {
+            height: 4px;
+        }
+        .pricing-grid::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .pricing-grid::-webkit-scrollbar-thumb {
+            background: rgba(79, 195, 247, 0.2);
+            border-radius: 2px;
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.6s ease forwards;
+            opacity: 0;
+        }
+
+        .animate-in:nth-child(1) { animation-delay: 0.1s; }
+        .animate-in:nth-child(2) { animation-delay: 0.2s; }
+        .animate-in:nth-child(3) { animation-delay: 0.3s; }
+
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .animate-in {
+                animation: none;
+                opacity: 1;
+            }
+            .model-card:hover,
+            .pricing-card:hover,
+            .tier-cta:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🧊 LiveCold</h1>
+        <div class="header-nav">
+            <a href="/">🗺️ Operations</a>
+            <a href="/analytics">📊 Analytics</a>
+            <a href="/sop-editor">📝 SOP Editor</a>
+            <a href="/pricing" class="active">💎 Pricing</a>
+        </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-badge">🚀 REVENUE MODELS</div>
+        <h2>Three ways LiveCold<br><span>generates revenue</span></h2>
+        <p>A multi-stream monetization strategy that aligns our success with our customers' outcomes — from predictable SaaS revenue to performance-based gains and sustainability credits.</p>
+    </div>
+
+    <!-- Value Metrics Strip -->
+    <div class="value-strip" style="margin: 0 auto 0; max-width: 1200px; padding: 0; margin-bottom: 0;">
+        <div class="value-item">
+            <div class="icon">🚚</div>
+            <div class="number">25+</div>
+            <div class="desc">Trucks Monitored</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">💰</div>
+            <div class="number">₹2Cr+</div>
+            <div class="desc">Cargo Protected</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">🌿</div>
+            <div class="number">150t</div>
+            <div class="desc">CO₂ Credits Earned</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">⚡</div>
+            <div class="number">99.9%</div>
+            <div class="desc">Platform Uptime</div>
+        </div>
+    </div>
+
+    <!-- Business Models Section -->
+    <div class="section-title">
+        <h3>Business Model</h3>
+        <h2>Revenue Streams</h2>
+        <p>Each model targets a different value axis — predictability, performance, and sustainability.</p>
+    </div>
+
+    <div class="models-grid">
+        <!-- Model I: SaaS Licensing -->
+        <div class="model-card saas animate-in">
+            <span class="model-icon">📊</span>
+            <div class="model-number">I. SaaS Licensing</div>
+            <h3>Platform Access</h3>
+            <div class="model-type-badge">Fixed Recurring</div>
+            <p class="model-desc">Monthly subscription per truck or facility for access to the Pathway Intelligence Pipeline and Admin Dashboard. Predictable MRR with tiered pricing based on fleet size.</p>
+            <div class="model-tagline">📌 Stability & Predictability</div>
+        </div>
+
+        <!-- Model II: Savings-Share -->
+        <div class="model-card savings animate-in">
+            <span class="model-icon">🎯</span>
+            <div class="model-number">II. Savings-Share Model</div>
+            <h3>Performance Fee</h3>
+            <div class="model-type-badge">Performance Based</div>
+            <p class="model-desc">Success-based fee (e.g., 5%) of the Total Value of Cargo Saved during verified spoilage/diversion events. We only earn when the customer saves — skin in the game.</p>
+            <div class="model-tagline">📌 High-Upside & Customer ROI</div>
+        </div>
+
+        <!-- Model III: Carbon Brokerage -->
+        <div class="model-card carbon animate-in">
+            <span class="model-icon">🌱</span>
+            <div class="model-number">III. Carbon Brokerage</div>
+            <h3>Sustainability Credits</h3>
+            <div class="model-type-badge">Sustainability Revenue</div>
+            <p class="model-desc">Transaction fee for certifying and facilitating the trade of carbon credits earned via prevented food/medicine waste. Incentivizing Green Bharat. 🇮🇳</p>
+            <div class="model-tagline">📌 Incentivizing Green Bharat</div>
+        </div>
+    </div>
+
+    <!-- Pricing Tiers Section -->
+    <div class="section-title">
+        <h3>Pricing</h3>
+        <h2>Choose Your Plan</h2>
+        <p>Flexible plans designed for cold chain operators of every scale — from startups to enterprise fleets.</p>
+    </div>
+
+    <div class="pricing-grid">
+        <!-- Starter -->
+        <div class="pricing-card animate-in">
+            <div class="tier-name">Starter</div>
+            <div class="tier-price">
+                <span class="currency">₹</span>4,999<span class="period">/mo</span>
+            </div>
+            <div class="tier-subtitle">per truck · billed monthly</div>
+            <ul class="tier-features">
+                <li>Real-time temperature monitoring</li>
+                <li>GPS tracking & route visualization</li>
+                <li>Basic anomaly detection (L1-L2)</li>
+                <li>Up to 10 trucks</li>
+                <li>Email alerts only</li>
+                <li>Dashboard access (1 user)</li>
+                <li class="disabled">Savings-share model</li>
+                <li class="disabled">Carbon credit brokerage</li>
+                <li class="disabled">Custom SOP integration</li>
+            </ul>
+            <button class="tier-cta secondary">Get Started</button>
+        </div>
+
+        <!-- Growth (Featured) -->
+        <div class="pricing-card featured animate-in">
+            <div class="popular-badge">MOST POPULAR</div>
+            <div class="tier-name">Growth</div>
+            <div class="tier-price">
+                <span class="currency">₹</span>9,999<span class="period">/mo</span>
+            </div>
+            <div class="tier-subtitle">per truck · billed annually</div>
+            <ul class="tier-features">
+                <li>Everything in Starter</li>
+                <li>4-layer anomaly detection (L1-L4)</li>
+                <li>AI-powered diversion engine</li>
+                <li>Up to 100 trucks</li>
+                <li>WhatsApp + Email alerts</li>
+                <li>Dashboard access (5 users)</li>
+                <li>5% Savings-share model included</li>
+                <li>Carbon credit tracking</li>
+                <li class="disabled">Custom SOP integration</li>
+            </ul>
+            <button class="tier-cta primary">Start Free Trial</button>
+        </div>
+
+        <!-- Enterprise -->
+        <div class="pricing-card animate-in">
+            <div class="tier-name">Enterprise</div>
+            <div class="tier-price" style="font-size: 36px;">
+                Custom
+            </div>
+            <div class="tier-subtitle">tailored to your fleet</div>
+            <ul class="tier-features">
+                <li>Everything in Growth</li>
+                <li>Unlimited trucks & facilities</li>
+                <li>Pathway RAG + Custom SOP integration</li>
+                <li>Dedicated Pathway pipeline instance</li>
+                <li>Full carbon brokerage service</li>
+                <li>Negotiated savings-share percentage</li>
+                <li>Priority support & SLA</li>
+                <li>Custom API integrations</li>
+                <li>On-premise deployment option</li>
+            </ul>
+            <button class="tier-cta secondary">Contact Sales</button>
+        </div>
+    </div>
+
+    <!-- Comparison: What's Included -->
+    <div class="section-title">
+        <h3>Model Breakdown</h3>
+        <h2>Revenue Model Details</h2>
+    </div>
+
+    <div class="value-strip" style="max-width: 1200px; margin: 0 auto 60px; padding: 0;">
+        <div class="value-item">
+            <div class="icon">📊</div>
+            <div class="number" style="font-size: 24px;">SaaS</div>
+            <div class="desc">₹4,999–Custom/mo per truck</div>
+            <div style="color: #5a6f85; font-size: 11px; margin-top: 8px;">Fixed recurring revenue</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">🎯</div>
+            <div class="number" style="font-size: 24px; color: #66bb6a;">5%</div>
+            <div class="desc">Of Cargo Value Saved</div>
+            <div style="color: #5a6f85; font-size: 11px; margin-top: 8px;">Performance-based upside</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">🌱</div>
+            <div class="number" style="font-size: 24px; color: #ce93d8;">₹1,000</div>
+            <div class="desc">Per Tonne CO₂ Credit</div>
+            <div style="color: #5a6f85; font-size: 11px; margin-top: 8px;">Green sustainability revenue</div>
+        </div>
+        <div class="value-item">
+            <div class="icon">📈</div>
+            <div class="number" style="font-size: 24px; color: #ffb74d;">3x</div>
+            <div class="desc">Revenue Multiplier</div>
+            <div style="color: #5a6f85; font-size: 11px; margin-top: 8px;">All three streams combined</div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="section-title">
+        <h3>FAQ</h3>
+        <h2>Common Questions</h2>
+    </div>
+
+    <div class="faq-section">
+        <div class="faq-item">
+            <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+                How does the Savings-Share Model work?
+                <span class="arrow">▾</span>
+            </div>
+            <div class="faq-a">
+                When our system detects a temperature breach and successfully diverts a truck to prevent spoilage, we calculate the value of cargo saved. LiveCold takes a 5% fee of the verified saved value. You only pay when we demonstrably save your cargo — perfect alignment of incentives.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+                What are Carbon Credits and how do I earn them?
+                <span class="arrow">▾</span>
+            </div>
+            <div class="faq-a">
+                When LiveCold diverts your truck and prevents food/medicine waste, the CO₂ that would have been emitted by producing replacement goods is avoided. We certify this avoidance as tradeable carbon credits at ₹1,000 per tonne CO₂. Our platform handles the certification, tracking, and facilitation.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+                Can I switch between plans?
+                <span class="arrow">▾</span>
+            </div>
+            <div class="faq-a">
+                Absolutely. You can upgrade or downgrade at any time. When upgrading, your new tier's features activate immediately. Enterprise customers can also negotiate custom savings-share percentages and carbon credit terms.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+                What hardware/sensors do I need?
+                <span class="arrow">▾</span>
+            </div>
+            <div class="faq-a">
+                LiveCold works with standard IoT temperature sensors and GPS trackers. We support integration via MQTT protocol. If you already have sensors, we can often integrate with your existing fleet — no additional hardware purchase required for most setups.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+                How does the Pathway AI pipeline work?
+                <span class="arrow">▾</span>
+            </div>
+            <div class="faq-a">
+                Our pipeline uses Pathway's real-time data processing framework for streaming anomaly detection (4 layers: bounds check, rate-of-change, Z-score statistical, and stuck-sensor detection) combined with a decision engine using sigmoid risk models and cost optimization. SOPs are loaded into a RAG pipeline for AI-powered recommendations.
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>🧊 LiveCold — Cold Chain Intelligence Platform · Built with <a href="https://pathway.com" target="_blank">Pathway</a></p>
+        <p style="margin-top: 8px;">Making India's cold chain smarter, safer, and greener. 🇮🇳</p>
+    </div>
+</body>
+
+</html>
