@@ -33,7 +33,7 @@ def main():
                 temp = base_temp + random.uniform(-0.5, 0.5)
 
             elif mode == "drift":
-                drift_rate = 0.6 if shipment["sensitivity"] == "HIGH" else 0.3
+                drift_rate = 0.15 if shipment["sensitivity"] == "HIGH" else 0.08
                 new_temp = base_temp + drift_rate
 
                 # ── Cap drift before it goes absurd ──────────────────────────
