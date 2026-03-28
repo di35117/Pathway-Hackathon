@@ -79,7 +79,29 @@ def build_pathway_pipeline():
     )
     print("  ✓ MQTT → Pathway sensor_events table")
 
-    # ── Step 2: Compute temperature excursions ──────────────────
+    # ── Step 2: Anomaly Detection (filter garbage data) ───────────
+    anomaly_count = {"total": 0}  # Track for dashboard
+
+    @pw.udf
+    def is_valid_reading(temp: float) -> bool:
+        """Filter physically impossible readings."""
+        if temp < -50 or temp > 80:
+            return False  # impossible for cold chain
+        return True
+
+    @pw.udf
+    def anomaly_label(temp: float) -> str:
+        if temp < -50 or temp > 80:
+            return "IMPOSSIBLE_TEMP"
+        return "OK"
+
+    # Filter out bad readings
+    valid_events = sensor_events.filter(
+        is_valid_reading(sensor_events.temp_c)
+    )
+    print("  ✓ Anomaly detection filter (rejects temp < -50 or > 80)")
+
+    # ── Step 3: Compute temperature excursions ──────────────────
     @pw.udf
     def is_excursion(temp: float, safe_min: float, safe_max: float) -> bool:
         return temp < safe_min or temp > safe_max
@@ -99,26 +121,27 @@ def build_pathway_pipeline():
         return round(min(severity * 0.7 + value_factor * 0.3, 1.0), 3)
 
     # Enriched sensor events with excursion detection
-    enriched_events = sensor_events.select(
-        timestamp=sensor_events.timestamp,
-        shipment_id=sensor_events.shipment_id,
-        temp_c=sensor_events.temp_c,
-        product_type=sensor_events.product_type,
-        cargo_value_inr=sensor_events.cargo_value_inr,
+    enriched_events = valid_events.select(
+        timestamp=valid_events.timestamp,
+        shipment_id=valid_events.shipment_id,
+        temp_c=valid_events.temp_c,
+        product_type=valid_events.product_type,
+        cargo_value_inr=valid_events.cargo_value_inr,
         is_excursion=is_excursion(
-            sensor_events.temp_c,
-            sensor_events.safe_min_temp,
-            sensor_events.safe_max_temp,
+            valid_events.temp_c,
+            valid_events.safe_min_temp,
+            valid_events.safe_max_temp,
         ),
         severity=excursion_severity(
-            sensor_events.temp_c,
-            sensor_events.safe_min_temp,
-            sensor_events.safe_max_temp,
+            valid_events.temp_c,
+            valid_events.safe_min_temp,
+            valid_events.safe_max_temp,
         ),
     )
     print("  ✓ Temperature excursion detection")
 
-    # ── Step 3: Per-shipment risk scores ────────────────────────
+    # ── Step 4: Per-shipment risk scores ────────────────────────
+
     risk_scores = enriched_events.select(
         shipment_id=enriched_events.shipment_id,
         product_type=enriched_events.product_type,

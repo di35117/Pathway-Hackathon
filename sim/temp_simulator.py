@@ -33,14 +33,14 @@ def main():
                 temp = base_temp + random.uniform(-0.5, 0.5)
 
             elif mode == "drift":
-                drift_rate = 0.05 if shipment["sensitivity"] == "HIGH" else 0.02
+                drift_rate = 0.15 if shipment["sensitivity"] == "HIGH" else 0.08
                 new_temp = base_temp + drift_rate
 
                 # ── Cap drift before it goes absurd ──────────────────────────
-                # If temp has crept more than 6°C above the safe ceiling,
+                # If temp has crept more than 12°C above the safe ceiling,
                 # simulate a refrigeration repair: snap back to safe range
                 # and return to stable mode.
-                if new_temp > safe_max + 6:
+                if new_temp > safe_max + 12:
                     print(f"🔧 [{shipment_id}] Refrigeration repaired — resetting to stable mode")
                     new_temp = safe_max - 1           # just inside safe window
                     shipment["temp_mode"] = "stable"  # switch back
@@ -51,6 +51,24 @@ def main():
 
             else:
                 temp = base_temp
+
+            # ── Inject anomalous readings for demo (~9% of readings) ────
+            anomaly_type = None
+            if random.random() < 0.03:
+                # L1: Hardware glitch — impossible value
+                temp = random.choice([999.0, -999.0, 500.0, -200.0])
+                anomaly_type = "L1_GLITCH"
+            elif random.random() < 0.04:
+                # L2: Sudden spike — sensor fault
+                temp = temp + random.choice([20, -20, 15, -15])
+                anomaly_type = "L2_SPIKE"
+            elif random.random() < 0.02:
+                # L3: Statistical outlier — mild but detectable
+                temp = temp + random.uniform(6, 10) * random.choice([1, -1])
+                anomaly_type = "L3_OUTLIER"
+
+            if anomaly_type:
+                print(f"⚡ [{shipment_id}] Injected {anomaly_type}: {temp}°C")
 
             event = {
                 "ts":                       datetime.utcnow().isoformat(),

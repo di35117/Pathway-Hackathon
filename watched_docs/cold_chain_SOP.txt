@@ -9,12 +9,27 @@
 
 All refrigerated cargo must be maintained within specified temperature ranges:
 
-- **Dairy Products**: +2°C to +6°C
-- **Fresh Meat & Poultry**: -2°C to +2°C
+- **Dairy Products**: +2°C to +10°C
+- **Frozen Meat**: -18°C to -12°C
 - **Seafood**: -1°C to +2°C
 - **Fresh Vegetables**: +7°C to +10°C
 - **Fresh Fruits**: +8°C to +12°C
-- **Frozen Products**: -18°C or below
+- **Vaccines**: +2°C to +8°C
+- **Pharmaceuticals**: +2°C to +8°C
+- **Ice Cream**: -25°C to -18°C
+- **Flowers**: +2°C to +8°C
+
+<!-- PRODUCT_TEMP_RANGES
+Vaccines:2:8
+Frozen_Meat:-18:-12
+Dairy:2:6
+Seafood:-1:2
+Vegetables:7:10
+Fruits:8:12
+Pharmaceuticals:2:8
+Ice_Cream:-25:-18
+Flowers:2:8
+-->
 
 ### §1.2 Temperature Monitoring
 
@@ -104,23 +119,21 @@ If Expected Loss (Continue) > Expected Loss (Divert) → DIVERT
 - Diversions costing ₹25,000-₹100,000: Operations Director approval
 - Diversions costing >₹100,000: VP Operations approval
 
-### §4.3 Emergency Diversion Hubs
+### §4.3 Emergency Diversion Hubs (Automated Sync)
 
-Approved diversion facilities with 24/7 cold storage:
+### §4.3 Automated Diversion Hub Management
 
-**North India:**
-- Hub A (Delhi): Cold storage capacity 500 tons, reefer repair available
-- Hub B (Gurgaon): Cold storage capacity 300 tons, 24/7 staffing
+The system maintains a dynamic database of approved cold storage facilities and reefer repair stations. When a diversion is required, the **Hub Manager** automatically identifies the optimal facility based on:
 
-**West India:**
-- Hub C (Mumbai): Cold storage capacity 800 tons, port access
-- Hub D (Pune): Cold storage capacity 400 tons, reefer repair available
+1.  **Proximity**: Real-time distance from the truck's current GPS location.
+2.  **Traffic Conditions**: Current congestion and estimated time of arrival (ETA).
+3.  **Capacity**: Current occupancy and available tonnes.
+4.  **Temperature Requirements**: Availability of specific zones (Ultra-Cold, Frozen, Chilled) matching the cargo type.
+5.  **Service Type**: Capability to handle both storage and mechanical reefer repairs.
 
-**South India:**
-- Hub E (Bangalore): Cold storage capacity 600 tons, reefer repair available
-- Hub F (Chennai): Cold storage capacity 500 tons, port access
+The selected hub details, including navigation links and contact information, are transmitted directly to the driver via the automated notification system.
 
-**Contact Information**: Maintain current hub contact list in vehicle documents.
+**Verification**: Facility availability and status are verified in real-time before any diversion recommendation is issued.
 
 ### §4.4 Diversion Fuel & Carbon Calculation
 

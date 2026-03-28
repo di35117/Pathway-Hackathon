@@ -13,16 +13,13 @@ RUN pip install --no-cache-dir -r requirements-slim.txt
 
 # Copy application code
 COPY main.py .
+COPY core/ core/
+COPY scripts/ scripts/
 COPY dashboard/ dashboard/
 COPY pipeline/ pipeline/
 COPY decision_engine/ decision_engine/
 COPY sim/ sim/
 COPY watched_docs/ watched_docs/
-# Pathway pipeline files
-COPY pathway_rag_pipeline.py .
-COPY pathway_metrics_pipeline.py .
-COPY pathway_integrated_full.py .
-COPY pathway_mqtt_bridge.py .
 
 # Create data directories
 RUN mkdir -p demo_data metrics
