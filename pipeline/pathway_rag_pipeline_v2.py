@@ -15,7 +15,6 @@ Endpoints (after running):
 
 import pathway as pw
 import os
-import json
 import time
 import hashlib
 import threading

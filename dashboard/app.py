@@ -26,6 +26,16 @@ log = logging.getLogger("dashboard")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# ── Auth: JWT login/register used by the React frontend ─────────
+# models.init_db() is idempotent; auth_bp mounts under /api/auth.
+from dashboard.models import init_db
+from dashboard.auth import initialize_super_admin
+from dashboard.auth_routes import auth_bp
+
+init_db()
+initialize_super_admin()
+app.register_blueprint(auth_bp)
+
 # ── Global State 
 shipments = {}      # shipment_id -> latest state
 alerts = []         # recent alerts (last 100)

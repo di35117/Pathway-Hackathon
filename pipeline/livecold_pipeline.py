@@ -112,7 +112,6 @@ def process_shipment(shipment_id):
         pipeline_client.publish(DECISION_TOPIC, json.dumps(final_output))
 
     # ── Terminal logging ──────────────────────────────────────────
-    action = final_output["recommended_action"]
     risk = final_output["risk_probability"]
     temp = final_output["temp"]
     sid = final_output["shipment_id"]

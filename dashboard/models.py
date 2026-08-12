@@ -6,8 +6,6 @@ User, Driver, Client, and Admin database models with SQLite
 import sqlite3
 import json
 import os
-from datetime import datetime
-from pathlib import Path
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "livecold.db")
 
@@ -143,7 +141,7 @@ def create_user(email, password_hash, role, name, phone=None):
         conn.commit()
         conn.close()
         return user_id
-    except sqlite3.IntegrityError as e:
+    except sqlite3.IntegrityError:
         conn.close()
         return None
 
@@ -167,7 +165,7 @@ def create_driver(user_id, vehicle_id, license_no=None):
         conn.commit()
         conn.close()
         return driver_id
-    except Exception as e:
+    except sqlite3.Error:
         conn.close()
         return None
 
@@ -191,7 +189,7 @@ def create_client(user_id, company_name, gst_no=None, city=None):
         conn.commit()
         conn.close()
         return client_id
-    except Exception as e:
+    except sqlite3.Error:
         conn.close()
         return None
 

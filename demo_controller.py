@@ -14,9 +14,7 @@ Usage:
 No external dependencies needed (no MQTT, no API keys).
 """
 
-import json
 import sys
-import random
 from datetime import datetime, timezone, timedelta
 
 # Force UTF-8 output on Windows
@@ -25,9 +23,8 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sim.shipment_factory import generate_shipments
-from simulation_v2.telemetry_emitter import TruckSimulator, init_routes
+from simulation_v2.telemetry_emitter import TruckSimulator
 from simulation_v2.route_engine import fetch_and_cache_all_routes
-from simulation_v2.route_cache import load_route
 from risk_engine_v2.risk_calculator_v2 import assess_risk_v2, reset_tracking
 from decision_engine_v2.decision_logic_v2 import decide_v2, reset_tracking as reset_decision
 
@@ -38,12 +35,6 @@ def _print_header(text, width=72):
     print(f"\n{'-'*width}")
     print(f"  {text}")
     print(f"{'-'*width}")
-
-
-def _print_json(data, label=""):
-    if label:
-        print(f"\n  >> {label}:")
-    print(json.dumps(data, indent=2, default=str))
 
 
 def run_all_shipments(shipments, ticks=20, verbose=True, tick_interval=30):

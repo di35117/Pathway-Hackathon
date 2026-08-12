@@ -175,7 +175,8 @@ def initialize_super_admin():
     )
 
     if user_id:
-        print(
-            f"⚠️ SuperAdmin initialized with email: {SUPER_ADMIN_EMAIL} and default password: {default_password}"
-        )
-        print("🔴 IMPORTANT: Change this password immediately in production!")
+        # ASCII only: this runs at dashboard import time and Windows consoles
+        # default to cp1252, which cannot encode emoji (raises UnicodeEncodeError).
+        print(f"[auth] SuperAdmin initialized: {SUPER_ADMIN_EMAIL}")
+        print("[auth] Password comes from SUPER_ADMIN_PASSWORD in .env - "
+              "change it before deploying.")

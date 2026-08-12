@@ -113,7 +113,6 @@ class StopScheduler:
             self._stop_remaining_sec -= delta_t_seconds
             if self._stop_remaining_sec <= 0:
                 # Stop finished
-                finished_stop = self._current_stop
                 self._current_stop = None
                 self._stop_remaining_sec = 0
                 return None

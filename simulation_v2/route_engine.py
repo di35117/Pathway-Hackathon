@@ -10,7 +10,6 @@ Priority:
 3. Synthetic polyline fallback
 """
 
-import json
 import logging
 import math
 import os
@@ -35,8 +34,7 @@ def _haversine_distance(lat1, lng1, lat2, lng2):
     return _haversine_m(lat1, lng1, lat2, lng2) / 1000.0
 
 
-def _generate_synthetic_polyline(origin_lat, origin_lng, dest_lat, dest_lng,
-                                 origin_name="", dest_name=""):
+def _generate_synthetic_polyline(origin_lat, origin_lng, dest_lat, dest_lng):
     """
     Generate a realistic polyline between origin and destination,
     following approximate highway geometry patterns.
@@ -173,8 +171,7 @@ def fetch_route(origin, destination):
     logger.warning("Route %s → %s: using synthetic fallback",
                     origin_name, dest_name)
     return _generate_synthetic_polyline(origin[1], origin[2],
-                                        destination[1], destination[2],
-                                        origin_name, dest_name)
+                                        destination[1], destination[2])
 
 
 def fetch_and_cache_all_routes(shipments):

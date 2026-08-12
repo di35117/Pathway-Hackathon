@@ -215,11 +215,8 @@ class AlertNotifier:
         # Count temp compliance from history
         history = report_data.get("temperature_history", [])
         total_readings = len(history)
-        # Simple compliance: count readings within safe range
-        compliance_pct = 100  # default
+        compliance_pct = 100  # default when there is no history
         if total_readings > 0:
-            safe_min = report_data.get("safe_range", "2°C to 8°C")
-            # Parse from report data directly
             in_range = sum(1 for h in history if h.get("temp") is not None)
             compliance_pct = round(in_range / total_readings * 100, 1)
 
