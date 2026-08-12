@@ -18,6 +18,7 @@ from decision_engine_v2.economic_model import (
 )
 from decision_engine_v2.confidence_scorer import score_confidence
 from decision_engine_v2.diversion_selector_v2 import choose_diversion_store
+from risk_engine_v2.cargo_profiles import get_default_routing_mode
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,23 @@ def _update_signal_duration(shipment_id, risk_level, delta_t=2.0):
         _signal_duration[shipment_id] = 0
         _last_risk_level[shipment_id] = risk_level
     return _signal_duration[shipment_id]
+
+
+def _resolve_routing_mode(shipment, risk_assessment):
+    """
+    Explicit per-shipment override wins; otherwise fall back to the cargo's
+    default from cargo_profiles.json (SAFETY for vaccines, ECO for produce).
+    """
+    mode = shipment.get("routing_mode")
+    if mode:
+        mode = str(mode).upper()
+        if mode in ("SAFETY", "BALANCED", "ECO"):
+            return mode
+
+    cargo = (shipment.get("product_type")
+             or risk_assessment.get("cargo_type")
+             or "dairy")
+    return get_default_routing_mode(cargo)
 
 
 def decide_v2(risk_assessment, shipment, hub_selector=None, delta_t=2.0,
@@ -119,25 +137,36 @@ def decide_v2(risk_assessment, shipment, hub_selector=None, delta_t=2.0,
             hub_eta = round(hub_distance / 40 * 60, 0)
 
     diversion = calculate_diversion_cost(hub_distance, risk_prob, cargo_value)
-    divert_check = should_divert(expected_loss, diversion["total_cost"])
+
+    routing_mode = _resolve_routing_mode(shipment, risk_assessment)
+    divert_check = should_divert(
+        expected_loss,
+        diversion["total_cost"],
+        routing_mode=routing_mode,
+        risk_probability=risk_prob,
+        co2_delta_kg=diversion["co2_delta_kg"],
+    )
 
     # --- Decision logic ---
+    # LOW risk always continues, in every mode. This is a sanity floor, not an
+    # optimisation: for valuable cargo the economic rule alone would fire even at
+    # 10% risk, because 10% of a 25 lakh consignment still exceeds a detour's
+    # cost. SAFETY's own trigger sits at 55%, well above the LOW band ceiling of
+    # 35%, so this gate never suppresses a safety-mode diversion.
     if risk_level == "LOW":
         action = "CONTINUE"
         reason = "Risk within acceptable limits"
     elif divert_check["should_divert"]:
         action = "DIVERT"
         reason = _build_divert_reason(risk_assessment)
-    elif (risk_level == "HIGH"
-          and divert_check["margin_pct"] <= divert_check.get("monitor_margin_threshold", 0.15)):
-        # Costs are close — monitor instead of making a borderline call
-        action = "MONITOR_CLOSELY"
-        reason = (f"Risk HIGH but costs within {divert_check['margin_pct']*100:.0f}% — "
-                  f"monitoring before committing to diversion")
     elif risk_level == "HIGH":
-        # HIGH risk but economics don't justify full diversion — monitor closely
         action = "MONITOR_CLOSELY"
-        reason = "Risk HIGH but diversion not economically justified — monitoring closely"
+        if divert_check["margin_pct"] <= divert_check.get("monitor_margin_threshold", 0.15):
+            reason = (f"Risk HIGH but costs within {divert_check['margin_pct']*100:.0f}% — "
+                      f"monitoring before committing to diversion")
+        else:
+            reason = (f"Risk HIGH but diversion not justified under {routing_mode} — "
+                      f"{divert_check['mode_rule']}")
     elif risk_level == "MEDIUM" and risk_prob > 0.55:
         action = "MONITOR_CLOSELY"
         reason = "Elevated risk trending upward — close monitoring"
@@ -161,6 +190,11 @@ def decide_v2(risk_assessment, shipment, hub_selector=None, delta_t=2.0,
         "divert_reason": reason,
         "risk_probability": risk_prob,
         "risk_level": risk_level,
+        "routing_mode": routing_mode,
+        "mode_rule": divert_check["mode_rule"],
+        "fuel_cost_inr": diversion["fuel_cost"],
+        "hub_cost_inr": diversion["hub_cost"],
+        "residual_loss_inr": diversion["residual_loss"],
     }
 
 

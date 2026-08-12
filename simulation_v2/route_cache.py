@@ -14,7 +14,7 @@ def _ensure_loaded():
     if _cache is not None:
         return
     if os.path.exists(_CACHE_PATH):
-        with open(_CACHE_PATH, "r") as f:
+        with open(_CACHE_PATH) as f:
             _cache = json.load(f)
     else:
         _cache = {}

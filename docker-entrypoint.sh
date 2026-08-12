@@ -30,10 +30,16 @@ python3 main.py dashboard &
 DASH_PID=$!
 sleep 2
 
-# Start MQTT Pipeline (background)
-echo "📡 Starting Pipeline..."
-python3 main.py mqtt &
+# Start MQTT Pipeline (background). Engine is configurable; v2 is the default.
+echo "📡 Starting Pipeline (engine=${LIVECOLD_ENGINE:-v2})..."
+python3 main.py mqtt --engine "${LIVECOLD_ENGINE:-v2}" &
 MQTT_PID=$!
+sleep 1
+
+# Start the Pathway 4-stream MQTT bridge (background)
+echo "🌊 Starting Pathway MQTT bridge (4 concurrent streams)..."
+python3 main.py pathway-bridge &
+BRIDGE_PID=$!
 sleep 1
 
 # Start ALL simulators (background)
@@ -56,7 +62,7 @@ echo "╚═══════════════════════�
 cleanup() {
     echo ""
     echo "🛑 Stopping all components..."
-    kill $RAG_PID $DASH_PID $MQTT_PID $SIM_PID 2>/dev/null
+    kill $RAG_PID $DASH_PID $MQTT_PID $BRIDGE_PID $SIM_PID 2>/dev/null
     echo "✅ Stopped."
 }
 trap cleanup EXIT INT TERM

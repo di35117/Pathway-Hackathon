@@ -19,7 +19,7 @@ def _load_config():
     global _config
     if _config is not None:
         return _config
-    with open(_CONFIG_PATH, "r") as f:
+    with open(_CONFIG_PATH) as f:
         _config = json.load(f)
     return _config
 

@@ -191,6 +191,15 @@ class AlertNotifier:
             self._anomaly_tracker.pop(shipment_id, None)
             self._repair_alerted.discard(shipment_id)
 
+    def reset(self):
+        """Clear all notification and dedup state. Used by tests."""
+        with self._lock:
+            self._notifications.clear()
+        with self._anomaly_lock:
+            self._anomaly_tracker.clear()
+            self._repair_alerted.clear()
+        self._divert_notified.clear()
+
     # ══════════════════════════════════════════════════════════════
     #  Condition 3: Delivery Complete → Email to Client
     # ══════════════════════════════════════════════════════════════
@@ -212,13 +221,39 @@ class AlertNotifier:
         incidents = "Yes" if report_data.get("divert_hub") else "No"
         divert_hub = report_data.get("divert_hub", "None")
 
-        # Count temp compliance from history
-        history = report_data.get("temperature_history", [])
-        total_readings = len(history)
-        compliance_pct = 100  # default when there is no history
-        if total_readings > 0:
-            in_range = sum(1 for h in history if h.get("temp") is not None)
-            compliance_pct = round(in_range / total_readings * 100, 1)
+        # Temperature compliance: the fraction of readings actually INSIDE the
+        # safe band. Counting readings that merely exist would report 100%
+        # compliance for a truck that spent the whole trip at 30C.
+        #
+        # Prefer the precomputed figure from the telemetry store, which is
+        # computed in SQL over the shipment's full journey. Fall back to the
+        # in-memory history when no store result was supplied.
+        precomputed = report_data.get("compliance") or {}
+        if precomputed.get("total_readings"):
+            total_readings = precomputed["total_readings"]
+            compliance_pct = precomputed.get("compliance_pct")
+            excursions = precomputed.get("readings_out_of_range")
+        else:
+            history = report_data.get("temperature_history", [])
+            safe_min = report_data.get("safe_min_temp")
+            safe_max = report_data.get("safe_max_temp")
+
+            readings = [
+                h.get("temp", h.get("temp_c"))
+                for h in history
+                if h.get("temp", h.get("temp_c")) is not None
+            ]
+            total_readings = len(readings)
+
+            if total_readings == 0:
+                compliance_pct, excursions = 100.0, 0
+            elif safe_min is None or safe_max is None:
+                # No band supplied — report coverage, do not claim compliance.
+                compliance_pct, excursions = None, None
+            else:
+                in_range = sum(1 for t in readings if safe_min <= t <= safe_max)
+                excursions = total_readings - in_range
+                compliance_pct = round(in_range / total_readings * 100, 1)
 
         subject = f"✅ Delivery Complete — {shipment_id} | {product}"
 
@@ -234,7 +269,9 @@ class AlertNotifier:
             f"📊 COMPLIANCE SUMMARY\n"
             f"{'─'*50}\n"
             f"Temperature Readings: {total_readings}\n"
-            f"Compliance Rate: {compliance_pct}%\n"
+            f"Compliance Rate: "
+            f"{'n/a' if compliance_pct is None else str(compliance_pct) + '%'}\n"
+            f"Readings Out of Range: {'n/a' if excursions is None else excursions}\n"
             f"Incidents/Diversions: {incidents}\n"
             f"Divert Hub Used: {divert_hub}\n"
             f"\n"
@@ -257,6 +294,8 @@ class AlertNotifier:
             "message": email_body,
             "product_type": product,
             "compliance_pct": compliance_pct,
+            "readings_out_of_range": excursions,
+            "total_readings": total_readings,
             "co2_saved_tonnes": co2_saved,
             "timestamp": datetime.now().isoformat(),
         }
@@ -265,8 +304,10 @@ class AlertNotifier:
         self._send_email(subject, email_body, recipient="client")
 
         log.info(
-            f"📧 Email → Client | {shipment_id} | {product} | "
-            f"Compliance: {compliance_pct}% | CO₂ saved: {co2_saved:.2f}t"
+            "Email -> Client | %s | %s | Compliance: %s | CO2 saved: %.2ft",
+            shipment_id, product,
+            "n/a" if compliance_pct is None else f"{compliance_pct}%",
+            co2_saved,
         )
         return notification
 

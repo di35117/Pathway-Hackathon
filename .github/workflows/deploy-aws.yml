@@ -1,0 +1,94 @@
+name: Deploy to AWS
+
+# Builds the image, pushes it to ECR, and rolls out a new ECS Fargate task
+# revision. Deploys run only from main, and only after CI is green.
+#
+# Required repository secrets:
+#   AWS_DEPLOY_ROLE_ARN  — IAM role trusted by GitHub OIDC (no static keys)
+#   AWS_REGION           — e.g. ap-south-1 (Mumbai, closest to the fleet)
+#   ECR_REPOSITORY       — e.g. livecold
+#   ECS_CLUSTER          — e.g. livecold-cluster
+#   ECS_SERVICE          — e.g. livecold-service
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm a manual rollout'
+        required: true
+        default: ""
+
+permissions:
+  id-token: write   # required for OIDC federation
+  contents: read
+
+jobs:
+  guard:
+    name: Confirm manual runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm != 'deploy'
+        run: |
+          echo "Manual deploys require typing 'deploy' in the confirm input." >&2
+          exit 1
+
+  deploy:
+    name: Build, push and roll out
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: production   # gate on a GitHub environment approval
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC, no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          # Tag by commit SHA so every deploy is traceable and rollback is a
+          # matter of pointing the service at an earlier tag.
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+                       -t "$REGISTRY/$REPOSITORY:latest" .
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+          echo "uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Render task definition with the new image
+        id: taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/ecs-task-definition.json
+          container-name: livecold
+          image: ${{ steps.image.outputs.uri }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.taskdef.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          # Block until ECS reports the new revision steady. Combined with the
+          # container healthcheck this gives an automatic rollback on failure.
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      - name: Report
+        run: |
+          echo "Deployed ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster: ${{ secrets.ECS_CLUSTER }}" >> "$GITHUB_STEP_SUMMARY"

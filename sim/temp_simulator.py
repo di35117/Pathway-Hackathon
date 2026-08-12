@@ -16,9 +16,8 @@ def main():
 
     print(f"🌡  Temperature Simulator Started with {len(shipments)} shipments...")
 
-    # Assign a fixed nearest-hub distance per shipment (used by pipeline for diversion cost)
-    for shipment in shipments:
-        shipment["nearest_hub_distance_km"] = random.randint(10, 80)
+    # Stuck-sensor (L4) state: shipment_id -> readings left to repeat.
+    stuck_remaining = {}
 
     while True:
         for shipment in shipments:
@@ -52,9 +51,20 @@ def main():
             else:
                 temp = base_temp
 
-            # ── Inject anomalous readings for demo (~9% of readings) ────
+            # ── Inject known faults, one per detector layer ─────────────
+            # Each branch targets a specific layer so a demo can show all four
+            # firing, and so the detector's counters can be asserted against the
+            # injected counts in tests.
             anomaly_type = None
-            if random.random() < 0.03:
+
+            if stuck_remaining.get(shipment_id, 0) > 0:
+                # L4: Frozen ADC — repeat the exact same value. The detector
+                # needs STUCK_SENSOR_COUNT (10) identical readings to trip, so
+                # this plays out over consecutive ticks rather than one.
+                stuck_remaining[shipment_id] -= 1
+                temp = shipment["_stuck_value"]
+                anomaly_type = "L4_STUCK" if stuck_remaining[shipment_id] == 0 else None
+            elif random.random() < 0.03:
                 # L1: Hardware glitch — impossible value
                 temp = random.choice([999.0, -999.0, 500.0, -200.0])
                 anomaly_type = "L1_GLITCH"
@@ -66,6 +76,11 @@ def main():
                 # L3: Statistical outlier — mild but detectable
                 temp = temp + random.uniform(6, 10) * random.choice([1, -1])
                 anomaly_type = "L3_OUTLIER"
+            elif random.random() < 0.004:
+                # L4: begin a stuck-sensor run of 12 identical readings.
+                shipment["_stuck_value"] = round(temp, 2)
+                stuck_remaining[shipment_id] = 12
+                temp = shipment["_stuck_value"]
 
             if anomaly_type:
                 print(f"⚡ [{shipment_id}] Injected {anomaly_type}: {temp}°C")

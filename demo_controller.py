@@ -18,7 +18,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 # Force UTF-8 output on Windows
-import io, os
+import io
+import os
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -66,7 +67,7 @@ def run_all_shipments(shipments, ticks=20, verbose=True, tick_interval=30):
     routes = fetch_and_cache_all_routes(shipments)
     route_types = {}
     for sid, route in routes.items():
-        road_classes = set(wp.get("road_class", "highway") for wp in route)
+        road_classes = {wp.get("road_class", "highway") for wp in route}
         route_types[sid] = ", ".join(sorted(road_classes))
     print(f"  Done! {len(routes)} routes cached with real NH/SH waypoints.\n")
 

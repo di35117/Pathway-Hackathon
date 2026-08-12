@@ -80,13 +80,13 @@ def _read_sop_files_from_disk() -> str:
         for fname in sorted(os.listdir(WATCHED_DOCS_DIR)):
             fpath = os.path.join(WATCHED_DOCS_DIR, fname)
             if os.path.isfile(fpath) and not fname.startswith('.'):
-                with open(fpath, "r", errors="replace") as f:
+                with open(fpath, errors="replace") as f:
                     content = f.read()
                     if content.strip():
                         context_parts.append(content)
     except Exception as e:
         print(f"  ⚠ Error reading SOP files: {e}")
-    
+
     joined = "\n\n".join(context_parts)
     _update_sync_status(len(joined), len(context_parts))
     return joined
@@ -94,7 +94,7 @@ def _read_sop_files_from_disk() -> str:
 
 def _read_sop_cached() -> str:
     """Read SOP files with mtime-based cache — only re-reads if files changed.
-    
+
     This preserves the real-time SOP update feature: editing the SOP file
     changes its mtime → cache invalidates → next query reads fresh content.
     """
@@ -124,13 +124,13 @@ def _read_sop_cached() -> str:
 
 def _get_relevant_chunks(query: str, sop_text: str, max_chars: int = 4000) -> str:
     """Simple keyword-based relevance filtering.
-    
+
     Splits SOP into paragraphs, scores by keyword overlap with query,
     returns only the most relevant sections. Reduces prompt size by ~60-70%.
     """
     chunks = sop_text.split("\n\n")
     query_words = set(query.lower().split())
-    
+
     scored = []
     for chunk in chunks:
         if not chunk.strip():
@@ -138,9 +138,9 @@ def _get_relevant_chunks(query: str, sop_text: str, max_chars: int = 4000) -> st
         chunk_words = set(chunk.lower().split())
         overlap = len(query_words & chunk_words)
         scored.append((overlap, chunk))
-    
+
     scored.sort(key=lambda x: x[0], reverse=True)
-    
+
     result = []
     total = 0
     for _, chunk in scored:
@@ -148,7 +148,7 @@ def _get_relevant_chunks(query: str, sop_text: str, max_chars: int = 4000) -> st
             break
         result.append(chunk)
         total += len(chunk)
-    
+
     return "\n\n".join(result)
 
 
@@ -172,13 +172,13 @@ def decode_document(data: bytes) -> str:
 @pw.udf
 def build_answer(query: str) -> str:
     """Call LLM with LIVE SOP context to answer the query.
-    
+
     Uses mtime-cached SOP reads (real-time updates still work) and
     last-working key/model tracking for fast responses.
     """
     # Read SOP content (cached, invalidates when file changes)
     sop_context = _read_sop_cached()
-    
+
     if not sop_context:
         return "No SOP documents found in watched_docs directory."
 
@@ -242,7 +242,7 @@ def build_answer(query: str) -> str:
             cooldown_key = f"{model}_{api_key[:8]}"
             with _cooldown_lock:
                 cooldown_until = _model_cooldowns.get(cooldown_key, 0)
-                
+
             if now < cooldown_until:
                 continue
 
@@ -346,8 +346,8 @@ def run_rag_pipeline(host="0.0.0.0", port=8765):
     print()
     print("Usage:")
     print(f'  curl -X POST http://localhost:{port}/v2/answer \\')
-    print(f'    -H "Content-Type: application/json" \\')
-    print(f'    -d \'{{"prompt": "What to do if temp exceeds threshold?"}}\'')
+    print('    -H "Content-Type: application/json" \\')
+    print('    -d \'{"prompt": "What to do if temp exceeds threshold?"}\'')
     print("=" * 60 + "\n")
 
     # ── Step 7: Run Pathway — starts streaming pipeline + REST ─

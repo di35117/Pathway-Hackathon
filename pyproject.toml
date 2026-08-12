@@ -1,15 +1,66 @@
 [project]
-name = "livecold-hackathon"
-version = "0.1.0"
-description = "Add your description here"
+name = "livecold"
+version = "1.0.0"
+description = "Real-time cold chain intelligence: 4-stream IoT ingestion, cargo-aware risk scoring, and economic diversion decisions."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pathway[all]",
+    "pathway",
     "python-dotenv",
     "paho-mqtt",
-    "sentence-transformers",
+    "flask",
+    "requests",
     "litellm",
-    "unstructured",
     "tiktoken",
+    "pyjwt",
+    "bcrypt",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff"]
+embeddings = ["sentence-transformers"]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "core/tests",
+    "pipeline/tests",
+    "risk_engine_v2/tests",
+    "decision_engine_v2/tests",
+    "decision_engine/tests",
+    "simulation_v2/tests",
+    "dashboard/tests",
+]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["frontend", ".venv", ".venv-slim", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes — undefined names, unused imports
+    "W",    # pycodestyle warnings
+    "B",    # bugbear — likely bugs
+    "UP",   # pyupgrade
+    "C4",   # comprehension simplifications
+]
+ignore = [
+    "E501",  # line length is handled by the formatter, not enforced here
+    "B008",  # function calls in argument defaults (used by Flask patterns)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests insert the repo root on sys.path before importing project modules, so
+# their imports legitimately are not at the top of the file.
+"**/tests/*" = ["F811", "F401", "E402"]
+# Same pattern: these modules extend sys.path or load .env before importing.
+"dashboard/app.py" = ["E402"]
+"demo_controller.py" = ["E402"]
+"main.py" = ["E402"]
+
+[tool.coverage.run]
+omit = ["*/tests/*", "*/__init__.py", "demo_controller.py"]

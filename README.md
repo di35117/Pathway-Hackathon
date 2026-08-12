@@ -4,94 +4,95 @@
 
 ### Real-Time Cold Chain Intelligence Platform
 
-**AI-powered monitoring • Autonomous diversion decisions • Live SOP compliance**
-**Built on [Pathway](https://pathway.com/) real-time streaming framework**
+**4-stream IoT ingestion • Cargo-aware risk scoring • Economic diversion decisions**
+**Built on [Pathway](https://pathway.com/) real-time streaming**
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)]()
-[![Pathway](https://img.shields.io/badge/Pathway-Real--Time_Streaming-FF6B35?logo=data:image/svg+xml;base64,PHN2Zy8+&logoColor=white)](https://pathway.com/)
-[![Gemini](https://img.shields.io/badge/Google_Gemini-LLM-8E75B2?logo=google&logoColor=white)]()
-[![MQTT](https://img.shields.io/badge/MQTT-Mosquitto-660066?logo=eclipsemosquitto&logoColor=white)]()
-[![Flask](https://img.shields.io/badge/Flask-Dashboard-000000?logo=flask&logoColor=white)]()
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)]()
+[![CI](https://img.shields.io/badge/CI-lint%20%2B%20162%20tests%20%2B%20docker-2ea44f)]()
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)]()
+[![Pathway](https://img.shields.io/badge/Pathway-Streaming-FF6B35)](https://pathway.com/)
+[![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-8E75B2?logo=google&logoColor=white)]()
+[![AWS](https://img.shields.io/badge/AWS-ECS%20Fargate-FF9900?logo=amazonaws&logoColor=white)]()
+[![License](https://img.shields.io/badge/License-MIT-blue)]()
 
----
-
-**India loses ₹92,000 Crore annually in cold chain failures.**
-LiveCold prevents this with real-time AI that monitors, predicts, decides, and acts — in milliseconds.
-
-[Features](#-features) · [Architecture](#-system-architecture) · [Quick Start](#-quick-start) · [How It Works](#-how-it-works) · [API Reference](#-api-reference)
+India loses an estimated **₹92,000 crore a year** to cold chain failures.
+LiveCold watches refrigerated trucks in real time and decides — per shipment, in rupees —
+whether to keep going or divert to cold storage.
 
 </div>
 
 ---
 
-## 🎯 What LiveCold Does
-
-LiveCold is an **end-to-end cold chain intelligence platform** that goes beyond monitoring — it **thinks and acts**:
+## What it does
 
 ```
-❌ Traditional: Sensor → Alert → Human reads email → Manual decision → Cargo already spoiled
+Traditional:  Sensor → Alert → Human reads email → Manual decision → Cargo already spoiled
 
-✅ LiveCold:    Sensor → Anomaly Filter → Risk Model → Cost Optimizer → Auto-Divert → Driver notified in 2 seconds
+LiveCold:     Sensor → Anomaly filter → 6-factor risk → Cost/carbon optimiser
+                     → Hub selection → Driver accepts → Truck physically re-routes
 ```
 
-| Capability | Description |
-|-----------|-------------|
-| 🌡️ **4-Stream IoT Monitoring** | Temperature, GPS, reefer telemetry, and door/shock events — 25 trucks streaming every 2 seconds |
-| 🛡️ **4-Layer Anomaly Detection** | Filters sensor glitches *before* they trigger false decisions (physical bounds, rate-of-change, z-score, stuck sensor) |
-| 🧠 **Sigmoid Risk Model** | Probability-based risk scoring — not binary IF/ELSE rules |
-| 💰 **Cost-Benefit Diversion** | Compares `expected cargo loss` vs `diversion cost` — only diverts when economically rational |
-| 🏭 **Intelligent Hub Matching** | 15 Indian hubs filtered by temp-zone compatibility, capacity, and traffic-aware ETA |
-| 🔀 **Live GPS Re-Routing** | Diverted trucks physically change course on the map toward the assigned hub |
-| 📲 **Interactive Notifications** | Drivers receive diversion proposals and must ACCEPT before GPS re-routing |
-| 📄 **Pathway RAG Pipeline** | Edit the SOP → AI learns it in 2 seconds → answers cite updated §sections |
-| 🌿 **Carbon Credits Engine** | Calculates CO₂ saved from prevented food waste, converts to ₹ credits |
-| ⚖️ **Per-Shipment Routing Modes** | SAFETY / BALANCED / ECO — configurable mid-journey with bidirectional MQTT sync |
+The system does not just raise alarms. It **decides**, and it justifies each decision in
+rupees: divert only when the expected cargo loss avoided exceeds the cost of diverting.
+
+| Capability | Where it lives |
+|---|---|
+| **4 concurrent IoT streams** — temperature, GPS, reefer, door/shock | `sim/`, `pipeline/pathway_mqtt_bridge.py` |
+| **4-layer anomaly filter** — bounds, rate-of-change, z-score, stuck sensor | `core/anomaly_detector.py` |
+| **6-factor cargo-aware risk model** with per-cargo weights | `risk_engine_v2/` |
+| **Predictive spoilage** — degree-hours + 30-minute temperature forecast | `risk_engine_v2/risk_calculator_v2.py` |
+| **Three real routing modes** — SAFETY / BALANCED / ECO | `decision_engine_v2/economic_model.py` |
+| **Confidence scoring** — factor agreement, signal duration, data staleness | `decision_engine_v2/confidence_scorer.py` |
+| **Traffic-aware hub selection** across 15 Indian hubs | `core/hub_manager.py` |
+| **Live GPS re-routing** — the truck actually changes course | `sim/gps_simulator.py` |
+| **Driver-in-the-loop** — diversions are proposed, not commanded | `dashboard/app.py` |
+| **Streaming RAG over the SOP** — edit the doc, next answer reflects it | `pipeline/pathway_rag_pipeline_v2.py` |
+| **Durable telemetry** — SQLite compliance record per consignment | `dashboard/telemetry_store.py` |
+| **CI/CD + AWS ECS deploy** | `.github/workflows/`, `deploy/` |
 
 ---
 
-## 🏗️ System Architecture
+## Architecture
+
+Four OS processes over an MQTT broker. This is the single most important fact about the
+system: the simulators are a drop-in stand-in for real reefer telematics, so replacing them
+with physical hardware changes nothing downstream.
 
 ```mermaid
 flowchart TB
-    subgraph SIM["🚚 IoT Simulation Layer (25 Trucks × 4 Sensors × Every 2s)"]
-        TS["🌡️ Temperature Sensor"]
-        GPS["📍 GPS Tracker"]
-        RF["❄️ Reefer Telemetry"]
-        DR["🚪 Door / Shock Sensor"]
+    subgraph SIM["🚚 IoT layer — 25 trucks × 4 sensors, every 2s"]
+        TS["🌡️ Temperature"]
+        GPS["📍 GPS"]
+        RF["❄️ Reefer"]
+        DR["🚪 Door / shock"]
     end
 
-    subgraph MQTT["📡 MQTT Broker (Mosquitto)"]
+    subgraph MQTT["📡 MQTT broker (Mosquitto)"]
         T1["livecold/temp"]
         T2["livecold/gps"]
         T3["livecold/reefer"]
         T4["livecold/door"]
     end
 
-    subgraph BRAIN["🧠 Intelligence Pipeline"]
-        AD["🛡️ 4-Layer Anomaly\nDetector"]
-        RM["📈 Sigmoid Risk Model\nP(spoilage)"]
-        DO["💰 Diversion Cost\nOptimizer"]
-        ME["📊 Metrics Engine\n₹ saved • CO₂ • rates"]
-        HM["🏭 Hub Manager\n15 hubs • traffic-aware ETA\ntemp-zone • capacity"]
+    subgraph BRAIN["🧠 Intelligence pipeline — the only decider"]
+        AD["🛡️ 4-layer anomaly filter"]
+        RM["📈 6-factor risk engine<br/>+ degree-hours + forecast"]
+        DO["💰 SAFETY / BALANCED / ECO<br/>economic optimiser"]
+        HM["🏭 Hub selection<br/>traffic-aware ETA"]
     end
 
-    subgraph ACTION["⚡ Decision & Action Layer"]
-        AN["📲 Alert Notifier\nWhatsApp → Driver\nWhatsApp → Ops\nEmail → Client"]
-        GR["🔀 GPS Re-Router\nPublish to livecold/divert\nTruck changes course"]
+    subgraph PW["🌊 Pathway streaming (4 ConnectorSubjects)"]
+        PWB["Per-stream UDFs<br/>→ reducers → cross-stream join<br/>→ fleet view + latency CSV"]
     end
 
-    subgraph RAG["📚 Pathway RAG Pipeline (:8765)"]
-        FS["pw.io.fs.read\n(streaming mode)"]
-        SOP["📄 SOP Document\n(Single Source of Truth)"]
-        LLM["🤖 Gemini LLM\nSOP-cited checklists"]
+    subgraph RAG["📚 Pathway RAG (:8765)"]
+        FS["pw.io.fs.read (streaming)"]
+        LLM["🤖 Gemini — SOP-cited checklists"]
     end
 
-    subgraph DASH["🌐 Presentation Layer (:5050)"]
-        MAP["🗺️ Live Dashboard\nMap • Alerts • KPIs\nRouting Mode Toggles"]
-        DRV["📱 Driver Dashboard\nMobile View\nNotification Inbox"]
-        ALY["📈 Analytics\nCarbon Credits\nAnomaly Breakdown"]
-        SED["📄 SOP Editor\nLive Edit + RAG Test"]
+    subgraph DASH["🌐 Dashboard (:5050)"]
+        MAP["🗺️ Live map + KPIs"]
+        DB["🗄️ SQLite telemetry store"]
+        DRV["📱 Driver accept/reject"]
     end
 
     TS --> T1
@@ -99,350 +100,379 @@ flowchart TB
     RF --> T3
     DR --> T4
 
-    T1 & T2 --> AD
-    AD -->|"Clean data only\n(~9% filtered)"| RM
+    T1 & T2 & T3 & T4 --> AD
+    T1 & T2 & T3 & T4 --> PWB
+    AD -->|clean readings only| RM
     RM --> DO
-    DO --> ME
-    DO -->|"DIVERT decision"| HM
-    HM --> AN
-    HM --> GR
-    GR -->|"New GPS target"| MQTT
+    DO --> HM
+    HM -->|livecold/decisions<br/>incl. selected hub| DASH
+    DRV -->|driver accepts| MQTT
+    MQTT -->|livecold/divert| GPS
 
-    T3 & T4 --> DASH
-    ME -->|"livecold/decisions"| DASH
-
-    SOP --> FS
     FS --> LLM
     LLM --> DASH
-
-    style SIM fill:#0d1b2a,stroke:#4fc3f7,stroke-width:2px,color:#e0e6f0
-    style MQTT fill:#0d1b2a,stroke:#ffc107,stroke-width:2px,color:#e0e6f0
-    style BRAIN fill:#0d1b2a,stroke:#ff5252,stroke-width:2px,color:#e0e6f0
-    style ACTION fill:#0d1b2a,stroke:#ce93d8,stroke-width:2px,color:#e0e6f0
-    style RAG fill:#0d1b2a,stroke:#81d4fa,stroke-width:2px,color:#e0e6f0
-    style DASH fill:#0d1b2a,stroke:#4caf50,stroke-width:2px,color:#e0e6f0
+    DASH --> DB
 ```
+
+**The rule:** the pipeline decides, the dashboard renders. Hub selection lives in the
+pipeline and travels inside the decision payload, so the driver's notification and the
+dashboard's proposal can never name different facilities.
 
 ---
 
-## 🔄 Data Flow
+## The decision, end to end
 
-```mermaid
-sequenceDiagram
-    participant S as 🚚 Simulators
-    participant M as 📡 MQTT
-    participant A as 🛡️ Anomaly Detector
-    participant P as 🧠 Risk + Decision
-    participant H as 🏭 Hub Manager
-    participant R as 📚 Pathway RAG
-    participant D as 🌐 Dashboard
+**1 · Filter the sensor before trusting it.** A diversion costs real money and real driver
+goodwill. Four ordered checks, cheapest first, short-circuiting on the first hit:
 
-    loop Every 2 seconds (25 trucks)
-        S->>M: Publish temp, GPS, reefer, door events
-        M->>A: livecold/temp readings
-        A->>A: L1 Bounds → L2 Rate → L3 Z-Score → L4 Stuck
-        alt Anomaly detected (~9%)
-            A--xP: ❌ Discard / use last good reading
-        else Clean reading
-            A->>P: ✅ Forward verified temp
-        end
-        P->>P: Sigmoid risk = σ(dev × 1.8 + exp × 0.2) × ETA
-        alt Risk > threshold
-            P->>H: 🚨 Find best hub (temp-zone + capacity + traffic ETA)
-            H-->>S: 🔀 DIVERT order via livecold/divert (GPS re-routes)
-            H->>D: 📲 WhatsApp to driver (hub name, Maps link, ETA)
-            D->>R: POST /v2/answer (SOP query for product)
-            R->>R: Pathway streams SOP → Gemini LLM
-            R-->>D: SOP checklist (§3.2, §4.1...)
-        else Risk ≤ threshold
-            P->>D: ✅ CONTINUE
-        end
-        M->>D: Live update map, metrics, shipment cards (SSE)
-    end
+| Layer | Catches | Response |
+|---|---|---|
+| L1 Physical bounds | `-999`, `500` — disconnected probe | Discard the reading |
+| L2 Rate of change | 20 °C step in 2 s — electrical fault | Substitute last good reading |
+| L3 Z-score (3.5σ, 20-sample window) | Plausible-looking outliers | Substitute rolling mean |
+| L4 Stuck sensor (10 identical reads) | Frozen ADC — the silent failure | Accept value, flag for maintenance |
+
+Rejected readings never enter the rolling window, so a burst of garbage cannot inflate σ
+and teach the filter to accept the fault it exists to catch.
+
+**2 · Score risk from all four streams.** Six signals, each normalised to [0, 1], weighted
+per cargo type, then mapped through a sigmoid:
+
 ```
+risk = σ( Σ wᵢ · scoreᵢ / Σ wᵢ )
+
+  temp_deviation · exposure_time · eta_pressure · door_events · compressor · drift_rate
+```
+
+Vaccines weight temperature at 0.45 and tolerate **10 minutes** out of range; frozen meat
+weights it at 0.20 and tolerates **120**. Same six signals, different physics.
+
+Alongside this runs a **degree-hours** integral (`∫ (T − T_safe) dt`) that never decays —
+the standard shelf-life formulation, and the model of irreversible damage.
+
+**3 · Forecast 30 minutes ahead.** Least-squares regression over recent readings projects
+where the cargo will be, guarded by a minimum 60-second observation window and a
+physically achievable rate ceiling. This is what makes intervention possible while a hub
+40 minutes away is still reachable.
+
+**4 · Decide economically, under the shipment's routing mode.**
+
+```
+expected_loss_continue = P(spoilage) × cargo_value
+total_divert_cost      = fuel + hub_handling + residual_risk × cargo_value
+```
+
+Diverting does not save the cargo, it saves ~70% of it — the truck still has to arrive and
+the cargo is already partly warm. Pricing that residual risk into the diversion side is
+what makes this a decision model rather than a dressed-up threshold.
+
+**5 · Propose, don't command.** The driver sees the hub, a Google Maps link and an ETA, and
+must accept. Only then does the truck re-route, and only then do the savings metrics move.
 
 ---
 
-## ⚡ How It Works
+## The three routing modes
 
-### The Story of a Shipment
+Genuinely different decision rules, not labels. Verified by
+`decision_engine_v2/tests/test_routing_modes.py`.
 
-**1. Departure** — 25 trucks leave cities across India carrying vaccines, dairy, seafood, frozen meat, and more. Temperature ranges come from the **SOP document** — the single source of truth.
+| Mode | Default for | Rule |
+|---|---|---|
+| 🛡️ **SAFETY** | Vaccines, Pharmaceuticals | Diverts when risk ≥ 55% **regardless of cost**, *or* when economics justify it. A strict superset of BALANCED — property-tested so it can never divert less readily. |
+| ⚖️ **BALANCED** | Dairy, Seafood, Frozen Meat, Ice Cream | Divert when `expected_loss > divert_cost + ₹500 buffer`. The buffer is a deadband so a break-even call doesn't oscillate on sensor noise. |
+| 🌿 **ECO** | Fruits, Vegetables, Flowers | Prices carbon into the cost at ₹4,000/kg CO₂ and hard-vetoes detours above 20 kg CO₂ unless the loss avoided is 3× the diversion cost. |
 
-**2. Anomaly Filtering** — A sensor reads -999°C? Our **4-layer filter** catches it instantly:
-
-| Layer | What It Catches | Action |
-|-------|----------------|--------|
-| L1: Physical Bounds | Impossible temps (500°C, -999°C) | ❌ Discard |
-| L2: Rate-of-Change | Sensor faults (20°C jump in 2s) | 🔄 Use last good reading |
-| L3: Z-Score | Statistical outliers (3.5σ from mean) | 🔄 Use rolling mean |
-| L4: Stuck Sensor | 10 identical readings | ⚠️ Flag for maintenance |
-
-**3. Risk Calculation** — Clean data enters the sigmoid risk model:
-```
-risk = σ(deviation × 1.8 + exposure × 0.2) × ETA_factor
-```
-
-**4. Diversion Decision** — Cost optimizer compares:
-```
-Expected Loss (Continue) = P(spoilage) × Cargo Value     = ₹6,96,000
-Total Divert Cost        = Fuel + Residual Risk × Value  = ₹1,596
-
-₹6,96,000 > ₹1,596 → DIVERT ✅  (Net saving: ₹6,94,404)
-```
-
-**5. Hub Selection** — Not just "nearest" — the **smartest** hub. 5 filters:
-- ✅ Available (not in maintenance)
-- 🌡️ Correct temperature zone (Ultra-Cold for vaccines, Chilled for dairy)
-- 📦 Has capacity (available tonnes > cargo weight)
-- 🚗 Best traffic-aware ETA (congestion zones for Delhi, Mumbai, Bangalore...)
-- 🔧 Repair station capability (for anomaly-triggered alerts)
-
-**6. Action & Driver Acceptance** — Driver gets a dashboard notification with the proposed hub, Google Maps link, and ETA. The truck only diverts *after* the driver clicks **Accept** on their interactive mobile dashboard. The main dashboard updates live.
+Defaults come from `risk_engine_v2/configs/cargo_profiles.json`; operators can override per
+shipment mid-journey via `POST /api/routing-mode/<id>`, and the override is sticky.
 
 ---
 
-## 🎛️ Three Routing Modes
+## The SOP is the single source of truth
 
-Each shipment gets a routing mode that changes how the diversion optimizer behaves:
+`watched_docs/cold_chain_SOP.txt` carries a machine-readable block that the humans editing
+the document also read:
 
-| Mode | Default For | Behavior |
-|------|------------|----------|
-| 🛡️ **SAFETY** | Vaccines, Pharmaceuticals | Nearest hub always, ignore cost |
-| ⚖️ **BALANCED** | Dairy, Seafood, Frozen Meat, Ice Cream | Optimize cost vs. safety |
-| 🌿 **ECO** | Fruits, Flowers | Minimize CO₂, accept longer detours |
+```
+<!-- PRODUCT_TEMP_RANGES
+Dairy:2:6
+Frozen_Meat:-18:-12
+Vaccines:2:8
+...
+-->
+```
 
-Modes can be **changed mid-journey** by the operations manager. The change syncs bidirectionally between dashboard and pipeline via MQTT.
+`core/sop_parser.py` parses it, caches on mtime, and reloads without a restart. Those
+ranges then drive:
+
+- which products the fleet carries (`sim/shipment_factory.py`)
+- the safe band the risk engine scores against (`risk_engine_v2/cargo_profiles.py`
+  overlays SOP ranges onto the risk weights)
+- what the dashboard displays and what the compliance report measures
+
+**Edit the SOP, and system behaviour changes.** The Docker build fails if the SOP is
+missing or unparseable, rather than silently falling back to hardcoded values.
+
+The same file feeds the Pathway RAG service, so editing it also changes the SOP-cited
+checklists the LLM produces — within about two seconds, no restart.
 
 ---
 
-## 📚 Pathway Integration — Real-Time RAG
+## Pathway integration
 
-LiveCold uses **Pathway** as the core streaming framework for live document intelligence:
+Pathway does two jobs, both real.
+
+**1 · Four concurrent telemetry streams** (`pipeline/pathway_mqtt_bridge.py`). Each MQTT
+topic gets its own `ConnectorSubject` and schema, so four readers run concurrently and are
+joined in the dataflow rather than in Python:
 
 ```python
-# Pathway watches SOP files in real-time (streaming mode)
-documents = pw.io.fs.read(
-    path="./watched_docs/",
-    format="binary",
-    mode="streaming",      # ← Detects file changes automatically
-    with_metadata=True,
-)
+temp_events   = pw.io.python.read(MQTTStreamSubject(TEMP_TOPIC,   _temp_row,   "temp"),   schema=TempEventSchema)
+gps_events    = pw.io.python.read(MQTTStreamSubject(GPS_TOPIC,    _gps_row,    "gps"),    schema=GpsEventSchema)
+reefer_events = pw.io.python.read(MQTTStreamSubject(REEFER_TOPIC, _reefer_row, "reefer"), schema=ReeferEventSchema)
+door_events   = pw.io.python.read(MQTTStreamSubject(DOOR_TOPIC,   _door_row,   "door"),   schema=DoorEventSchema)
 
-# REST API accepts natural language queries
-queries, response_writer = pw.io.http.rest_connector(
-    host="0.0.0.0", port=8765,
-    route="/v2/answer",
-    schema=QuerySchema,
-)
-
-# LLM reads FRESH SOP content on every query
-results = queries.select(result=build_answer(queries.prompt))
+# per-stream UDFs → incremental groupby reducers → cross-stream join
+fleet_view = temp_agg.join(door_agg, ...).join(reefer_agg, ...)
 ```
 
-**The magic:** Edit the SOP file → Pathway detects the change → Next query automatically uses updated content → Answer cites the new §sections. **No restart. No redeployment. 2-second latency.**
+Every event is stamped at publish and measured at ingest; percentiles are written to
+`metrics/pathway_latency.csv` every 15 seconds, so the latency claim is measured rather
+than asserted.
+
+**2 · Live document intelligence** (`pipeline/pathway_rag_pipeline_v2.py`):
+
+```python
+documents = pw.io.fs.read(path=WATCHED_DOCS_DIR, format="binary", mode="streaming")
+queries, response_writer = pw.io.http.rest_connector(host, port, route="/v2/answer", schema=QuerySchema)
+response_writer(queries.select(result=build_answer(queries.prompt)))
+```
+
+The SOP cache is keyed on `(filename, mtime, size)`, so repeat queries do zero disk I/O but
+any edit invalidates instantly — caching and liveness at the same time.
 
 ---
 
-## 🚀 Quick Start
+## Measured performance
+
+Real numbers from the running system, not estimates. `GET /api/latency` reports both.
+
+| Metric | Measured | Where |
+|---|---|---|
+| Pipeline latency (sensor publish → decision published) | **p50 ≈ 1 ms, p95 < 5 ms** | `livecold/latency`, `pipeline.get_metrics()` |
+| UI refresh (decision → SSE frame on the wire) | **p95 < 100 ms** | `/api/latency` → `ui_refresh` |
+| Pathway ingest latency, per stream | p50/p95/p99 every 15 s | `metrics/pathway_latency.csv` |
+| SOP-cited checklist generation | **< 2 s** (Gemini 2.5 Flash, cached SOP context) | `/api/rag-query` |
+| Concurrent shipments | **25**, independently tracked | `test_twenty_five_concurrent_shipments` |
+| Anomalies filtered | ~9% of readings, all 4 layers exercised | `/api/anomalies` |
+
+Latency is instrumented, not inferred: `_latency_samples` in the pipeline and
+`_ui_latency_samples` in the dashboard, both reported as percentiles.
+
+---
+
+## Quick start
 
 ### Prerequisites
-- Python 3.11+
-- Mosquitto MQTT broker
-- Google Gemini API key
-
-### Local Setup
+Python 3.11+, Mosquitto, a Google Gemini API key.
 
 ```bash
-# 1. Clone & setup
 git clone https://github.com/di35117/Pathway-Hackathon.git
 cd Pathway-Hackathon
-git checkout Tarun
 
-# 2. Create virtual environment
-python3.11 -m venv .venv-slim
-source .venv-slim/bin/activate
-pip install -r requirements-slim.txt
+python3.11 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 
-# 3. Configure
-echo "GOOGLE_API_KEY=your_gemini_key" > .env
-
-# 4. Start MQTT broker
+cp .env.example .env       # then add your GOOGLE_API_KEY
 mosquitto -c mosquitto.conf -d
-
-# 5. Launch (3 terminals)
-python main.py mqtt         # Terminal 1: Intelligence Pipeline
-python main.py dashboard    # Terminal 2: Dashboard (http://localhost:5050)
-python main.py sim-all      # Terminal 3: All 4 IoT Simulators
-
-# Optional: Pathway RAG Pipeline
-python main.py rag-v2       # Terminal 4: RAG API (http://localhost:8765)
 ```
+
+Five terminals (or one `docker compose up`):
+
+```bash
+python main.py mqtt            # intelligence pipeline   (V2 engine by default)
+python main.py dashboard       # dashboard              → http://localhost:5050
+python main.py sim-all         # all 4 IoT simulators
+python main.py rag             # Pathway RAG            → http://localhost:8765
+python main.py pathway-bridge  # Pathway 4-stream bridge
+```
+
+Run the V1 engine for comparison: `python main.py mqtt --engine v1`.
 
 ### Docker
 
 ```bash
-echo "GOOGLE_API_KEY=your_gemini_key" > .env
-docker-compose up -d
-# Dashboard: http://localhost:5050
+cp .env.example .env    # add GOOGLE_API_KEY
+docker compose up -d
 ```
 
-### Access Points
+### No broker, no keys — pure engine demo
+
+```bash
+python demo_controller.py demo    # 4 showcase scenarios on real OSRM road geometry
+python demo_controller.py full    # all 25 shipments, 30 simulated minutes
+```
+
+### Access points
 
 | Service | URL |
-|---------|-----|
-| 🌐 Main Dashboard | http://localhost:5050 |
-| 📱 Driver Dashboard | http://localhost:5050/driver/SHP_1 |
-| 📈 Analytics | http://localhost:5050/analytics |
-| 📄 SOP Editor | http://localhost:5050/sop-editor |
-| 📚 RAG API | http://localhost:8765/v2/answer |
-| ❤️ Health Check | http://localhost:5050/health |
+|---|---|
+| Dashboard | http://localhost:5050 |
+| Driver view | http://localhost:5050/driver/SHP_1 |
+| Analytics | http://localhost:5050/analytics |
+| SOP editor | http://localhost:5050/sop-editor |
+| Pathway RAG | http://localhost:8765/v2/answer |
+| Health | http://localhost:5050/health |
+| Latency | http://localhost:5050/api/latency |
 
 ---
 
-## 📡 API Reference
+## API reference
 
-### Pathway RAG — SOP Q&A
+### Telemetry & decisions
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/shipments` | GET | All active shipments with live state |
+| `/api/alerts` | GET | Recent DIVERT + door-open alerts |
+| `/api/metrics` | GET | System KPIs (₹ saved, CO₂, diversions) |
+| `/api/stream` | GET | Server-Sent Events, one queue per client |
+| `/api/latency` | GET | Measured pipeline and UI latency percentiles |
+| `/api/history/<id>` | GET | In-memory temperature ring + 30-min prediction |
+| `/api/telemetry/<id>` | GET | **Durable** telemetry, decisions, anomalies, compliance |
+| `/api/fleet-summary` | GET | SQL aggregates across everything persisted |
+
+### Decisions & hubs
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/hubs` | GET | All 15 cold storage hubs |
+| `/api/nearest-hubs/<id>` | GET | 3 best-ETA compatible hubs |
+| `/api/accept-diversion/<id>` | POST | Driver accepts — truck re-routes |
+| `/api/routing-mode/<id>` | GET/POST | Read or override SAFETY/BALANCED/ECO |
+| `/api/shipment-report/<id>` | GET | Full compliance report incl. carbon credits |
+| `/api/anomalies` | GET | Anomaly stats, global and per shipment |
+
+### SOP & RAG
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/sop-content` | GET/POST | Read or edit the SOP (triggers live reload) |
+| `/api/sop-status` | GET | Sync status, change count |
+| `/api/rag-query` | POST | Query the SOP via Pathway RAG, LLM fallback |
+
+### Auth
+`POST /api/auth/register` · `POST /api/auth/login` · `GET /api/auth/verify` ·
+`POST /api/auth/logout` — JWT (HS256, 24 h) over bcrypt, with role-based route guards.
 
 ```bash
 curl -X POST http://localhost:8765/v2/answer \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "What should I do if dairy temperature exceeds 8°C?"}'
+  -d '{"prompt": "What should I do if dairy temperature exceeds 8C?"}'
 ```
-
-### Dashboard APIs
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/shipments` | GET | All 25 active shipments with live state |
-| `/api/alerts` | GET | Recent DIVERT + door open alerts (last 50) |
-| `/api/metrics` | GET | System-wide KPIs (₹ saved, CO₂, diversions) |
-| `/api/stream` | GET | Server-Sent Events for real-time updates |
-| `/api/hubs` | GET | All 15 cold storage hubs with status |
-| `/api/nearest-hubs/<id>` | GET | 3 nearest compatible hubs for a shipment |
-| `/api/history/<id>` | GET | Temperature history + 30-min prediction |
-| `/api/analytics` | GET | Carbon credits, anomaly breakdown, financials |
-| `/api/anomalies` | GET | Global + per-shipment anomaly detection stats |
-| `/api/notifications` | GET | All WhatsApp/email notification log |
-| `/api/shipment-report/<id>` | GET | Full compliance report for a shipment |
-| `/api/routing-mode/<id>` | GET/POST | Get or change routing mode (SAFETY/BALANCED/ECO) |
-| `/api/sop-content` | GET/POST | Read or edit the SOP document |
-| `/api/rag-query` | POST | Query SOP via RAG (with LLM fallback) |
-| `/api/sop-status` | GET | SOP sync status (last modified, change count) |
 
 ---
 
-## 📂 Project Structure
+## Project structure
 
 ```
-hack/
-├── main.py                         # 🎮 Unified CLI (rag, dashboard, mqtt, sim-all, etc.)
-│
+├── main.py                        # unified CLI
+├── core/
+│   ├── anomaly_detector.py        # 4-layer sensor filter
+│   ├── hub_manager.py             # 15 hubs, traffic-aware ETA, zone matching
+│   ├── alert_notifier.py          # driver / ops / client notifications
+│   └── sop_parser.py              # SOP → temperature ranges (source of truth)
 ├── pipeline/
-│   └── livecold_pipeline.py        # 🧠 Central brain: MQTT → Anomaly → Risk → Decision → Publish
-│
-├── decision_engine/
-│   ├── evaluator.py                # Orchestrator: risk → diversion → metrics
-│   ├── risk_model.py               # Sigmoid P(spoilage) calculator
-│   ├── diversion_optimizer.py      # Cost vs loss optimizer (supports cost/eco modes)
-│   └── metrics_engine.py           # ₹ saved, CO₂ delta, diversion rates
-│
-├── anomaly_detector.py             # 🛡️ 4-layer anomaly filter (267 lines of defense)
-├── hub_manager.py                  # 🏭 15 hubs, traffic-aware ETA, temp-zone matching
-├── alert_notifier.py               # 📲 WhatsApp + Email notifications (3 conditions)
-├── sop_parser.py                   # 📄 Reads temp ranges from SOP (single source of truth)
-│
-├── sim/
-│   ├── shipment_factory.py         # 🏭 25 shipments with scripted demo scenarios
-│   ├── temp_simulator.py           # 🌡️ Temperature with drift/stable/critical modes
-│   ├── gps_simulator.py            # 📍 GPS with live diversion re-routing
-│   ├── reefer_simulator.py         # ❄️ Compressor status, power draw, cycles
-│   ├── door_simulator.py           # 🚪 Door open/close + shock events
-│   └── config.py                   # 20 Indian cities, MQTT topics, intervals
-│
-├── pathway_rag_pipeline_v2.py      # 📚 Pathway streaming RAG (pw.io.fs.read + REST)
-├── pathway_metrics_pipeline.py     # 📊 Pathway metrics aggregation
-├── pathway_integrated_full.py      # 🔗 Full integrated Pathway pipeline
-│
-│   ├── dashboard/
-│   │   ├── app.py                      # 🌐 Flask server (1061 lines, 20+ routes)
-│   │   └── templates/
-│   │       ├── index_1.html            # Main dashboard (map + alerts + metrics)
-│   │       ├── driver_1.html           # 📱 Interactive mobile driver dashboard
-│   │       ├── analytics_1.html        # 📈 Carbon credits + anomaly analytics
-│   │       └── sop_editor_1.html       # 📄 Live SOP editor + RAG tester
-│
-├── watched_docs/
-│   └── cold_chain_SOP.txt          # 📋 SOP document (10 sections, 399 lines)
-│
-├── Dockerfile                      # 🐳 Multi-component Docker image
-├── docker-compose.yml              # Full stack with Mosquitto
-├── requirements-slim.txt           # Python dependencies
-└── mosquitto.conf                  # MQTT broker config
+│   ├── livecold_pipeline.py       # the brain: 4 streams → risk → decision → hub
+│   ├── pathway_mqtt_bridge.py     # Pathway: 4 concurrent ConnectorSubjects
+│   └── pathway_rag_pipeline_v2.py # Pathway: streaming RAG over the SOP
+├── risk_engine_v2/                # 6-factor cargo-aware risk (live default)
+├── decision_engine_v2/            # SAFETY/BALANCED/ECO + confidence scoring
+├── decision_engine/               # V1 single-factor engine (fallback, --engine v1)
+├── simulation_v2/                 # OSRM road routing, traffic bands, driver stops
+├── sim/                           # MQTT IoT simulators (4 streams + fault injection)
+├── dashboard/
+│   ├── app.py                     # Flask, SSE, 36 routes
+│   ├── telemetry_store.py         # SQLite persistence, batched writes
+│   ├── auth.py / models.py        # JWT + bcrypt + audit log
+│   └── templates/                 # Leaflet dashboard, driver view, analytics
+├── frontend/                      # React 19 + Vite (auth wired; ops views in progress)
+├── watched_docs/cold_chain_SOP.txt
+├── deploy/                        # ECS task definition + runbook
+└── .github/workflows/             # CI (lint, tests, docker) + AWS deploy
 ```
 
 ---
 
-## 🔧 Configuration
+## Testing
+
+```bash
+pytest              # 162 tests
+ruff check .        # clean
+```
+
+| Suite | Covers |
+|---|---|
+| `core/tests/` | SOP parsing and live reload, all 4 anomaly layers, window poisoning |
+| `decision_engine/tests/` | V1 risk **property tests** — monotonic, bounded, never saturates |
+| `decision_engine_v2/tests/` | Economics, confidence, and that the 3 modes genuinely differ |
+| `risk_engine_v2/tests/` | Cargo profiles, exposure hysteresis, drift regression |
+| `simulation_v2/tests/` | Haversine, polyline traversal, traffic bands, driver stops |
+| `pipeline/tests/` | Full integration: 4 streams → decision, dedup, latency, 25 shipments |
+| `dashboard/tests/` | SQLite round-trip, compliance maths, backpressure |
+
+Notable property test: `test_never_saturates_to_certainty` and
+`test_strictly_increasing_across_the_operational_range` exist because an earlier risk model
+saturated to exactly 1.0 past 3 °C of deviation, making the "probability" a step function.
+
+---
+
+## Deployment
+
+CI runs lint, tests on Python 3.11 and 3.12, a Pathway import smoke test, and a Docker
+build that **asserts the SOP parses inside the image**.
+
+Deploys go to ECS Fargate via OIDC (no static AWS keys), tagged by commit SHA, gated on a
+GitHub environment approval, and wait for service stability so a failed healthcheck rolls
+back automatically. Full runbook and the scale-out path in [`deploy/README.md`](deploy/README.md).
+
+---
+
+## Configuration
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `GOOGLE_API_KEY` | — | Primary Gemini API key (required for RAG) |
-| `GOOGLE_API_KEY_2` | — | Backup API key (auto-rotates on rate limit) |
-| `MQTT_HOST` | `localhost` | MQTT broker hostname |
+|---|---|---|
+| `GOOGLE_API_KEY` | — | Gemini key (required for RAG). Extra `*_API_KEY` vars auto-rotate. |
+| `MQTT_HOST` / `MQTT_PORT` | `localhost` / `1883` | Broker location |
+| `LIVECOLD_ENGINE` | `v2` | `v1` runs the legacy single-factor engine |
+| `JWT_SECRET` | dev default | **Must be set in production** |
+| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` | — | Bootstrap admin |
+| `ORS_API_KEY` | — | Optional OpenRouteService fallback for routing |
+
+Tunable without touching code: `risk_engine_v2/configs/cargo_profiles.json` (weights,
+tolerances, mode defaults), `decision_engine_v2/configs/cost_config.json` (fuel, carbon
+price, thresholds), `simulation_v2/configs/` (traffic bands, driver stops).
 
 ---
 
-## 📊 Live Demo Metrics (25 shipments)
+## Known limitations
 
-| Metric | Value |
-|--------|-------|
-| 🚚 Active Shipments | 25 across 20 Indian cities |
-| 🌡️ Sensor Events/Second | ~50 |
-| 🚨 Diversions Triggered | 15-17 within first 30 seconds |
-| 🛡️ Anomalies Filtered | ~9% of readings (zero false diversions) |
-| 💰 Cargo Value Monitored | ₹2.71 Cr |
-| 💰 Cargo Saved | ₹1.5+ Cr |
-| 🌿 CO₂ Impact Tracked | 170+ kg |
-| 🏭 Hub Database | 15 hubs across India |
-| 📦 Product Types | 9 (Vaccines, Meat, Dairy, Seafood, Vegetables, Fruits, Pharma, Ice Cream, Flowers) |
+Stated plainly, because they are the honest boundary of what this demonstrates.
 
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Real-Time Streaming** | [Pathway](https://pathway.com/) — `pw.io.fs.read`, `pw.io.http.rest_connector`, UDFs |
-| **LLM** | Google Gemini 2.5 Flash (via LiteLLM, with 5-model fallback chain) |
-| **Message Broker** | Eclipse Mosquitto (MQTT) |
-| **Backend** | Flask + paho-mqtt |
-| **Frontend** | Leaflet.js (maps) + Server-Sent Events + Vanilla JS |
-| **Anomaly Detection** | Custom 4-layer engine (physical bounds, rate-of-change, z-score, stuck sensor) |
-| **Risk Model** | Sigmoid-based probability with exposure tracking |
-| **Containerization** | Docker + Docker Compose |
+- **Telemetry is simulated.** The physics are grounded — ~0.5 °C/min with doors open,
+  real OSRM road geometry, traffic bands calibrated to Indian metro congestion — but the
+  model parameters need real reefer data to be *calibrated* rather than merely reasoned.
+- **The 70% risk-reduction factor is asserted, not fitted.** With historical spoilage
+  outcomes it should be learned per hub and per cargo type.
+- **Two frontends.** The Jinja dashboard is the shipped product. The React app has auth
+  wired end to end; its company and driver views still render mock data.
+- **Single-node.** MQTT at QoS 0 has no replay, and per-shipment state is in process
+  memory. The decision logic is a pure function of one shipment's state with no
+  cross-shipment joins, so it partitions cleanly by `shipment_id` — the scale-out path is
+  Kafka plus Redis, documented in `deploy/README.md`.
+- **The anomaly filter is tuned for false positives.** A genuinely fast real excursion can
+  look like an L2 rate fault. The mitigation is corroboration across independent signals
+  (compressor and door state), which the risk engine already consumes but the filter does
+  not yet cross-check.
 
 ---
 
-## 🏆 Key Differentiators
-
-1. **Math-based, not rule-based** — Sigmoid risk probability, not `IF temp > threshold`
-2. **Smartest hub, not nearest** — Traffic-aware ETA with congestion zone modeling
-3. **Actual re-routing** — GPS simulator physically moves trucks to diversion hubs
-4. **Live document intelligence** — Edit the SOP, AI learns it in 2 seconds via Pathway streaming
-5. **Zero false diversions** — 4-layer anomaly filter catches sensor glitches before the risk model
-6. **Economically rational** — Every ₹1 spent on diversion is justified by ₹10+ in prevented loss
-7. **Sustainable** — Carbon credits calculated for every prevented waste event
-8. **Production-ready patterns** — Thread-safe state, API key rotation, rate-limit handling, dedup logic
-
----
-
-## 👥 Team
-
-Built for the **Pathway Real-Time AI Hackathon** — demonstrating real-time streaming intelligence for India's cold chain logistics.
-
----
-
-## 📄 License
+## License
 
 MIT

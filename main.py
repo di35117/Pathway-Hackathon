@@ -40,7 +40,13 @@ def main():
 
     elif command == "mqtt":
         from pipeline.livecold_pipeline import start_pipeline
-        start_pipeline()
+        # `python main.py mqtt --engine v1` runs the legacy single-factor engine.
+        engine = "v2"
+        if "--engine" in sys.argv:
+            idx = sys.argv.index("--engine")
+            if idx + 1 < len(sys.argv) and sys.argv[idx + 1] in ("v1", "v2"):
+                engine = sys.argv[idx + 1]
+        start_pipeline(engine=engine)
 
     elif command == "dashboard":
         from dashboard.app import main as dash_main

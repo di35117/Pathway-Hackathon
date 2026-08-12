@@ -80,11 +80,11 @@ def main():
                     shipment["eta_minutes_remaining"] = 0
                     shipment["speed_kmph"] = 0
                     shipment["arrived"] = True
-                    
+
                     # Make sure the final position is exactly the hub
                     shipment["current_lat"] = target_lat
                     shipment["current_lon"] = target_lon
-                    
+
                     # Do NOT delete from active_diversions so pipeline knows it's still diverted
                     # Do NOT reset ETA to 30 minutes
                     pass

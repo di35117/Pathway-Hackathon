@@ -28,9 +28,22 @@ class TestCargoProfiles:
         assert p["ideal_temp_min"] == -18
 
     def test_get_temp_range(self):
+        # Ranges are overlaid from the SOP document, which specifies -1..2 for
+        # seafood. Editing the SOP's PRODUCT_TEMP_RANGES block changes this.
         lo, hi = get_temp_range("seafood")
-        assert lo == 0
-        assert hi == 4
+        assert lo == -1
+        assert hi == 2
+
+    def test_temp_ranges_come_from_sop(self):
+        p = load_cargo_profile("dairy")
+        assert p["temp_range_source"] == "sop"
+        assert (p["ideal_temp_min"], p["ideal_temp_max"]) == (2, 6)
+
+    def test_all_nine_sop_products_have_profiles(self):
+        from core.sop_parser import get_product_temp_ranges
+        sop_products = {n.lower().replace(" ", "_") for n in get_product_temp_ranges()}
+        assert sop_products.issubset(set(list_cargo_types()))
+        assert len(sop_products) == 9
 
     def test_get_weights_has_all_keys(self):
         w = get_weights("dairy")
@@ -142,7 +155,7 @@ class TestRiskCalculator:
     def test_high_risk_temp_deviation(self):
         # Simulate sustained high temperature (15°C, 7° above max)
         # Need enough readings with big delta_t to accumulate exposure
-        for i in range(40):
+        for _ in range(40):
             telemetry = self._make_telemetry(temp=15.0)
             result = assess_risk_v2(telemetry, delta_t_seconds=60)
         assert result["risk_level"] in ("HIGH", "MEDIUM")

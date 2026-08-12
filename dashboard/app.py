@@ -4,6 +4,7 @@ Real-time cold-chain monitoring dashboard with live map and metrics.
 Subscribes to MQTT for live data and serves a web UI.
 """
 
+import collections
 import json
 import threading
 import logging
@@ -31,12 +32,16 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 from dashboard.models import init_db
 from dashboard.auth import initialize_super_admin
 from dashboard.auth_routes import auth_bp
+from dashboard import telemetry_store
 
 init_db()
 initialize_super_admin()
 app.register_blueprint(auth_bp)
 
-# ── Global State 
+# Durable telemetry: SQLite, written from a batching background thread.
+telemetry_store.init_telemetry_db()
+
+# ── Global State
 shipments = {}      # shipment_id -> latest state
 alerts = []         # recent alerts (last 100)
 diverted_shipments_saved = {}  # shipment_id -> saved_amount (prevent double-counting)
@@ -49,7 +54,38 @@ metrics = {
     "high_risk_events": 0,
     "anomalies_filtered": 0,
 }
-sse_queue = queue.Queue(maxsize=500)
+# ── SSE fan-out ─────────────────────────────────────────────────
+# One queue PER connected client, not one shared queue. Queue.get() removes the
+# item, so a single shared queue means N browsers split the stream between them
+# instead of each receiving every update.
+_sse_clients = set()
+_sse_lock = threading.Lock()
+SSE_CLIENT_QUEUE_SIZE = 500
+
+# Rolling UI-refresh latency: time from a decision arriving over MQTT to the
+# corresponding SSE frame being handed to the client. Surfaced at /api/latency.
+_ui_latency_samples = collections.deque(maxlen=1000)
+_pipeline_latency = {"p50_ms": None, "p95_ms": None, "max_ms": None,
+                     "samples": 0, "sub_second_pct": None, "engine": None}
+
+
+def broadcast(event):
+    """
+    Push one event to every connected SSE client.
+
+    Non-blocking by design: if a client's queue is full it is slow or gone, and
+    dropping a frame for that client is strictly better than stalling the MQTT
+    ingest thread for everyone.
+    """
+    payload = json.dumps(event)
+    enqueued_at = time.time()
+    with _sse_lock:
+        clients = list(_sse_clients)
+    for q in clients:
+        try:
+            q.put_nowait((payload, enqueued_at))
+        except queue.Full:
+            pass
 
 # ── Per-Shipment Routing Mode ───────────────────────────────────
 # SAFETY  = nearest hub always, ignore cost (vaccines, pharma)
@@ -98,7 +134,7 @@ sop_in_flight = False
 SOP_CONTEXT = ""
 sop_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "watched_docs", "cold_chain_SOP.txt")
 try:
-    with open(sop_path, "r") as f:
+    with open(sop_path) as f:
         SOP_CONTEXT = f.read()
     log.info(f"📄 Loaded SOP document ({len(SOP_CONTEXT)} chars)")
 except Exception as e:
@@ -122,7 +158,7 @@ def _sop_file_watcher():
                 continue
             mtime = os.path.getmtime(sop_path)
             if mtime != sop_sync_status["last_mtime"]:
-                with open(sop_path, "r") as f:
+                with open(sop_path) as f:
                     new_content = f.read()
                 SOP_CONTEXT = new_content
                 sop_sync_status["last_mtime"] = mtime
@@ -133,17 +169,14 @@ def _sop_file_watcher():
                 rag_cache = {}
                 log.info(f"🔄 SOP updated! Reloaded {len(new_content)} chars, cache cleared (change #{sop_sync_status['change_count']})")
                 # Push SSE event to dashboard
-                try:
-                    sse_queue.put_nowait(json.dumps({
-                        "type": "sop_update",
-                        "data": {
-                            "last_modified": sop_sync_status["last_modified"],
-                            "file_size": sop_sync_status["file_size"],
-                            "change_count": sop_sync_status["change_count"],
-                        }
-                    }))
-                except queue.Full:
-                    pass
+                broadcast({
+                    "type": "sop_update",
+                    "data": {
+                        "last_modified": sop_sync_status["last_modified"],
+                        "file_size": sop_sync_status["file_size"],
+                        "change_count": sop_sync_status["change_count"],
+                    },
+                })
         except Exception as e:
             log.warning(f"SOP watcher error: {e}")
             time.sleep(5)
@@ -271,15 +304,35 @@ def on_message(client, userdata, msg):
     if topic == "livecold/divert":
         return
     # ── Receive notifications from pipeline via MQTT ──────────
+    # ── Anomaly audit trail from the pipeline ─────────────────
+    if topic == "livecold/anomalies":
+        try:
+            a = json.loads(msg.payload.decode())
+            telemetry_store.record_anomaly(
+                a.get("shipment_id"), a.get("layer"),
+                a.get("reason"), a.get("raw_temp"),
+            )
+            sid = a.get("shipment_id")
+            if sid in shipments:
+                shipments[sid]["last_anomaly"] = a
+        except Exception:
+            pass
+        return
+
+    # ── Pipeline latency stats (sensor -> decision) ───────────
+    if topic == "livecold/latency":
+        try:
+            _pipeline_latency.update(json.loads(msg.payload.decode()))
+        except Exception:
+            pass
+        return
+
     if topic == "livecold/notifications":
         try:
             notification = json.loads(msg.payload.decode())
             alert_notifier._store_notification(notification)
             log.info(f"📲 Notification received: [{notification.get('type')}] {notification.get('shipment_id')}")
-            try:
-                sse_queue.put_nowait(json.dumps({"type": "notification", "data": notification}))
-            except queue.Full:
-                pass
+            broadcast({"type": "notification", "data": notification})
         except Exception:
             pass
         return
@@ -329,6 +382,9 @@ def on_message(client, userdata, msg):
         if len(temp_history[shipment_id]) > 50:
             temp_history[shipment_id] = temp_history[shipment_id][-50:]
 
+        # Durable copy: the in-memory ring is for charts, SQLite is the record.
+        telemetry_store.record_telemetry(shipment_id, s)
+
     elif topic == "livecold/decisions":
         # ── Pipeline decisions: the SINGLE source of truth ────────
         risk = data.get("risk_probability", 0.05)
@@ -353,6 +409,25 @@ def on_message(client, userdata, msg):
         s["decision_reason"] = data.get("decision_reason", "")
         s["exposure_minutes"] = data.get("exposure_minutes", 0)
 
+        # ── V2 engine fields (absent when running --engine v1) ────
+        s["risk_level"] = data.get("risk_level", s.get("risk_level", "LOW"))
+        s["confidence"] = data.get("confidence", s.get("confidence"))
+        s["confidence_reason"] = data.get("confidence_reason", "")
+        s["factor_scores"] = data.get("factor_scores", s.get("factor_scores"))
+        s["spoilage_probability"] = data.get("spoilage_probability")
+        s["exposure_degree_hours"] = data.get("exposure_degree_hours")
+        s["drift_rate_c_min"] = data.get("drift_rate_c_min")
+        s["forecast"] = data.get("forecast")
+        s["mode_rule"] = data.get("mode_rule", "")
+        s["engine"] = data.get("engine", "v2")
+        s["door_status"] = data.get("door_status", s.get("door_status", "CLOSED"))
+        s["compressor_status"] = data.get("compressor_status", s.get("compressor_status", "ON"))
+        if data.get("pipeline_latency_ms") is not None:
+            s["pipeline_latency_ms"] = data["pipeline_latency_ms"]
+
+        # Persist every decision — this is the audit trail for a consignment.
+        telemetry_store.record_decision(shipment_id, data)
+
         # Anomaly stats from pipeline (passed through MQTT since they're in separate process)
         metrics["anomalies_filtered"] = data.get("global_anomalies", metrics["anomalies_filtered"])
         if data.get("global_anomaly_breakdown"):
@@ -371,53 +446,61 @@ def on_message(client, userdata, msg):
                 "sop_recommendation": "Consulting SOP..."
             }
 
-            # Find nearest hub and prepare diversion order (but don't publish yet)
-            if s.get("lat") and s.get("lon") and not s.get("divert_proposed"):
-                cargo = s.get("product_type", "dairy").lower().replace(" ", "_")
-                hubs = find_nearest_hubs(
-                    s["lat"], s["lon"],
-                    cargo_type=cargo, top_n=1
-                )
-                if hubs:
-                    best_hub = hubs[0]
-                    divert_order = {
-                        "shipment_id": shipment_id,
-                        "hub_lat": best_hub["lat"],
-                        "hub_lon": best_hub["lon"],
-                        "hub_name": best_hub["name"],
-                        "hub_id": best_hub["id"],
-                        "distance_km": best_hub["distance_km"],
-                        "eta_minutes": best_hub["eta_minutes"],
-                        "expected_loss_inr": data.get("expected_loss_inr", 0),
-                        "diversion_cost_inr": data.get("diversion_cost_inr", 0),
-                        "co2_delta_kg": data.get("co2_delta_kg", best_hub["distance_km"] * 0.9)
-                    }
-                    
-                    # Store as pending instead of taking immediate action
-                    s["pending_divert_order"] = divert_order
-                    s["divert_proposed"] = True
-                    alert["divert_hub"] = "Proposed: " + best_hub["name"]
-                    alert["divert_distance"] = best_hub["distance_km"]
-                    
-                    # Automatically push notification to driver to ask for acceptance
-                    divert_msg = {
-                        "type": "DIVERT_PROPOSED",
-                        "shipment_id": shipment_id,
-                        "message": f"🚨 DIVERSION PROPOSED\nHigh risk detected.\nRoute to {best_hub['name']} ({best_hub['distance_km']}km away).\nPlease accept this diversion.",
-                        "channel": "dashboard",
-                        "timestamp": datetime.now().isoformat(),
-                        "sent_to_driver": True
-                    }
-                    
-                    if shipment_id not in driver_notifications:
-                        driver_notifications[shipment_id] = []
-                    driver_notifications[shipment_id].append(divert_msg)
-                    
-                    try:
-                        mqtt_client and mqtt_client.publish(f"livecold/driver-notifications/{shipment_id}", json.dumps(divert_msg))
-                    except Exception:
-                        pass
-                    log.info(f"⏳ Diversion proposed for {shipment_id} to {best_hub['name']}. Waiting for driver acceptance.")
+            # The hub is chosen by the pipeline and travels inside the decision
+            # payload. The dashboard must NOT select its own: both processes
+            # calling find_nearest_hubs() independently could pick different
+            # hubs for the same event, so the driver's WhatsApp named one
+            # facility while the dashboard proposed another.
+            best_hub = data.get("selected_hub")
+            if best_hub and not s.get("divert_proposed"):
+                divert_order = {
+                    "shipment_id": shipment_id,
+                    "hub_lat": best_hub["lat"],
+                    "hub_lon": best_hub["lon"],
+                    "hub_name": best_hub["name"],
+                    "hub_id": best_hub["id"],
+                    "distance_km": best_hub["distance_km"],
+                    "eta_minutes": best_hub["eta_minutes"],
+                    "expected_loss_inr": data.get("expected_loss_inr", 0),
+                    "diversion_cost_inr": data.get("diversion_cost_inr", 0),
+                    "co2_delta_kg": data.get("co2_delta_kg", best_hub.get("co2_extra_kg", 0)),
+                }
+
+                # Propose, don't command — the truck only moves once the driver
+                # accepts via /api/accept-diversion.
+                s["pending_divert_order"] = divert_order
+                s["divert_proposed"] = True
+                alert["divert_hub"] = "Proposed: " + best_hub["name"]
+                alert["divert_distance"] = best_hub["distance_km"]
+
+                divert_msg = {
+                    "type": "DIVERT_PROPOSED",
+                    "shipment_id": shipment_id,
+                    "message": (
+                        f"DIVERSION PROPOSED\n"
+                        f"{s.get('product_type', '')} at {s.get('temp')}°C — "
+                        f"risk {risk*100:.0f}%.\n"
+                        f"Route to {best_hub['name']} "
+                        f"({best_hub['distance_km']}km, ETA {best_hub['eta_minutes']} min).\n"
+                        f"Please accept this diversion."
+                    ),
+                    "channel": "dashboard",
+                    "timestamp": datetime.now().isoformat(),
+                    "sent_to_driver": True,
+                }
+
+                driver_notifications.setdefault(shipment_id, []).append(divert_msg)
+
+                try:
+                    if mqtt_client:
+                        mqtt_client.publish(
+                            f"livecold/driver-notifications/{shipment_id}",
+                            json.dumps(divert_msg),
+                        )
+                except Exception:
+                    pass
+                log.info("Diversion proposed for %s to %s — awaiting driver acceptance",
+                         shipment_id, best_hub["name"])
 
             # Fetch RAG recommendation in background thread
             def fetch_sop(alert_ref, at, pt, sid, t):
@@ -434,10 +517,7 @@ def on_message(client, userdata, msg):
             if len(alerts) > 100:
                 alerts.pop(0)
 
-            try:
-                sse_queue.put_nowait(json.dumps({"type": "alert", "data": alert}))
-            except queue.Full:
-                pass
+            broadcast({"type": "alert", "data": alert})
 
     elif topic == "livecold/gps":
         s["lat"] = data.get("lat")
@@ -461,27 +541,24 @@ def on_message(client, userdata, msg):
                 "timestamp": s["last_update"],
                 "sop_recommendation": "Consulting SOP..."
             }
-            
+
             # Fetch SOP for door events too
             def fetch_door_sop(alert_ref, pt, sid, t):
                 answer = get_sop_recommendation("DOOR_OPEN", pt, sid, t)
                 alert_ref["sop_recommendation"] = answer
-            
+
             threading.Thread(
                 target=fetch_door_sop,
                 args=(alert, s.get("product_type", ""), shipment_id, s.get("temp", 0)),
                 daemon=True
             ).start()
-            
+
             alerts.append(alert)
             if len(alerts) > 100:
                 alerts.pop(0)
 
-    # Push state update via SSE
-    try:
-        sse_queue.put_nowait(json.dumps({"type": "update", "data": s}))
-    except queue.Full:
-        pass
+    # Push state update to every connected client
+    broadcast({"type": "update", "data": s})
 
 
 def start_mqtt():
@@ -502,7 +579,7 @@ def start_mqtt():
 # Hub management
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from core.hub_manager import get_all_hubs, find_nearest_hubs, update_hub_status, simulate_hub_dynamics
+from core.hub_manager import get_all_hubs, find_nearest_hubs, simulate_hub_dynamics
 
 start_time = time.time()
 
@@ -602,6 +679,34 @@ def api_set_global_routing():
     return jsonify({"old": old, "new": new_mode})
 
 
+@app.route("/api/telemetry/<shipment_id>")
+def api_telemetry(shipment_id):
+    """
+    Durable telemetry from SQLite — survives restarts, unlike /api/history,
+    which serves the in-memory ring buffer used for live charts.
+    """
+    limit = min(int(request.args.get("limit", 200)), 2000)
+    s = shipments.get(shipment_id, {})
+    safe_min = s.get("safe_min_temp", 2)
+    safe_max = s.get("safe_max_temp", 8)
+    return jsonify({
+        "shipment_id": shipment_id,
+        "telemetry": telemetry_store.get_history(shipment_id, limit=limit),
+        "decisions": telemetry_store.get_decisions(shipment_id, limit=50),
+        "anomalies": telemetry_store.get_shipment_anomalies(shipment_id),
+        "compliance": telemetry_store.get_compliance(shipment_id, safe_min, safe_max),
+    })
+
+
+@app.route("/api/fleet-summary")
+def api_fleet_summary():
+    """Aggregates computed in SQL across everything persisted so far."""
+    return jsonify({
+        "store": telemetry_store.get_fleet_summary(),
+        "writer": telemetry_store.get_stats(),
+    })
+
+
 @app.route("/api/history/<shipment_id>")
 def api_history(shipment_id):
     """Temperature history for charts and prediction."""
@@ -632,7 +737,7 @@ def api_accept_diversion(shipment_id):
     s = shipments.get(shipment_id)
     if not s:
         return jsonify({"error": "Shipment not found"}), 404
-        
+
     divert_order = s.get("pending_divert_order")
     if not divert_order:
         return jsonify({"error": "No pending diversion found"}), 400
@@ -642,30 +747,30 @@ def api_accept_diversion(shipment_id):
         "livecold/divert",
         json.dumps(divert_order)
     )
-    
+
     # Commit changes and metrics
     s["divert_hub"] = divert_order["hub_name"]
     s["divert_distance_km"] = divert_order["distance_km"]
     s["divert_accepted"] = True
-    
+
     # Only count each shipment's diversion ONCE
     if shipment_id not in diverted_shipments_saved:
         metrics["total_diversions"] += 1
-        
+
         # Calculate saved value from stored order
         exp_loss = divert_order.get("expected_loss_inr", 0)
         div_cost = divert_order.get("diversion_cost_inr", 0)
         saved = max(0, int(exp_loss - div_cost))
-        
+
         diverted_shipments_saved[shipment_id] = saved
         metrics["total_value_saved"] += saved
         metrics["total_co2_delta"] += divert_order.get("co2_delta_kg", divert_order["distance_km"] * 0.9)
-        
+
     log.info(f"✅ Diversion ACCEPTED by driver for {shipment_id}. Truck redirecting to {divert_order['hub_name']}.")
-    
+
     # Remove pending status
     s.pop("pending_divert_order", None)
-    
+
     return jsonify({"status": "accepted", "shipment_id": shipment_id, "hub": divert_order["hub_name"]})
 
 @app.route("/api/hubs")
@@ -710,15 +815,79 @@ def api_anomalies():
 
 @app.route("/api/stream")
 def api_stream():
-    """Server-Sent Events for real-time updates"""
+    """
+    Server-Sent Events for real-time updates.
+
+    Each connection gets its own queue, registered on connect and removed in the
+    generator's finally block on disconnect, so every client receives every
+    event rather than competing for a shared one.
+
+    SSE rather than WebSockets because the traffic is one-directional
+    (server to browser) and SSE gives automatic reconnection over plain HTTP.
+    """
+    client_q = queue.Queue(maxsize=SSE_CLIENT_QUEUE_SIZE)
+    with _sse_lock:
+        _sse_clients.add(client_q)
+
     def generate():
-        while True:
-            try:
-                data = sse_queue.get(timeout=5)
-                yield f"data: {data}\n\n"
-            except queue.Empty:
-                yield f"data: {json.dumps({'type': 'ping'})}\n\n"
-    return Response(generate(), mimetype="text/event-stream")
+        try:
+            # Immediate snapshot so a reconnecting client is not blank until the
+            # next telemetry tick.
+            yield f"data: {json.dumps({'type': 'connected', 'shipments': len(shipments)})}\n\n"
+            while True:
+                try:
+                    payload, enqueued_at = client_q.get(timeout=5)
+                    # Time from the event being produced to it reaching the wire.
+                    _ui_latency_samples.append((time.time() - enqueued_at) * 1000.0)
+                    yield f"data: {payload}\n\n"
+                except queue.Empty:
+                    # Heartbeat: proxies and load balancers drop idle connections.
+                    yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+        finally:
+            with _sse_lock:
+                _sse_clients.discard(client_q)
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache",
+                             "X-Accel-Buffering": "no"})
+
+
+def _percentiles(samples):
+    if not samples:
+        return {"p50_ms": None, "p95_ms": None, "max_ms": None, "samples": 0}
+    ordered = sorted(samples)
+    n = len(ordered)
+    return {
+        "p50_ms": round(ordered[n // 2], 2),
+        "p95_ms": round(ordered[min(n - 1, int(n * 0.95))], 2),
+        "max_ms": round(ordered[-1], 2),
+        "samples": n,
+    }
+
+
+@app.route("/api/latency")
+def api_latency():
+    """
+    Measured latency, end to end.
+
+    pipeline — sensor publish to decision publish, reported by the pipeline
+               process over livecold/latency.
+    ui       — decision arrival to SSE frame handed to the browser, measured here.
+
+    Both are real measurements taken from the running system, not estimates.
+    """
+    ui = _percentiles(list(_ui_latency_samples))
+    ui_p95 = ui["p95_ms"]
+    return jsonify({
+        "pipeline": _pipeline_latency,
+        "ui_refresh": ui,
+        "sse_clients": len(_sse_clients),
+        "ui_under_100ms": (ui_p95 is not None and ui_p95 < 100),
+        "pipeline_sub_second": (
+            _pipeline_latency.get("p95_ms") is not None
+            and _pipeline_latency["p95_ms"] < 1000
+        ),
+    })
 
 
 @app.route("/api/notifications")
@@ -741,25 +910,33 @@ def api_send_delivery_report(shipment_id):
         return jsonify({"error": "Shipment not found"}), 404
 
     # Build report data (reuse the existing report logic)
-    history = temp_history.get(shipment_id, [])
     pkey = s.get("product_type", "dairy").lower().replace(" ", "_")
     cargo_tonnes = 5
     prod_co2 = CO2_PER_TONNE.get(pkey, 3.0) * cargo_tonnes
     detour_co2 = s.get("divert_distance_km", 0) * 0.0009
     co2_saved = max(0, prod_co2 - detour_co2) if s.get("divert_hub") else 0
 
+    safe_min = s.get("safe_min_temp", 2)
+    safe_max = s.get("safe_max_temp", 8)
+    # Compliance comes from the durable store, computed in SQL over the full
+    # journey rather than the last 30 in-memory samples.
+    compliance = telemetry_store.get_compliance(shipment_id, safe_min, safe_max)
+
     report_data = {
         "shipment_id": shipment_id,
         "product_type": s.get("product_type", ""),
         "origin": s.get("origin", ""),
         "destination": s.get("destination", ""),
-        "safe_range": f"{s.get('safe_min_temp', 2)}°C to {s.get('safe_max_temp', 8)}°C",
+        "safe_range": f"{safe_min}°C to {safe_max}°C",
+        "safe_min_temp": safe_min,
+        "safe_max_temp": safe_max,
         "divert_hub": s.get("divert_hub", None),
+        "compliance": compliance,
         "carbon_credits": {
             "co2_saved_tonnes": round(co2_saved, 2),
             "credits_inr": round(co2_saved * CARBON_CREDIT_RATE_INR, 2),
         },
-        "temperature_history": history[-30:],
+        "temperature_history": telemetry_store.get_history(shipment_id, limit=500),
     }
 
     notification = alert_notifier.send_delivery_report(shipment_id, report_data)
@@ -918,14 +1095,19 @@ def api_shipment_report(shipment_id):
     if not s:
         return jsonify({"error": "Shipment not found"}), 404
 
-    history = temp_history.get(shipment_id, [])
     pkey = s.get("product_type", "dairy").lower().replace(" ", "_")
+    safe_min = s.get("safe_min_temp", 2)
+    safe_max = s.get("safe_max_temp", 8)
 
     # Carbon credit for this shipment
     cargo_tonnes = 5
     prod_co2 = CO2_PER_TONNE.get(pkey, 3.0) * cargo_tonnes
     detour_co2 = s.get("divert_distance_km", 0) * 0.0009
     co2_saved = max(0, prod_co2 - detour_co2) if s.get("divert_hub") else 0
+
+    # Compliance and history come from the durable store, so a report covers the
+    # whole journey rather than whatever survives in the in-memory ring buffer.
+    compliance = telemetry_store.get_compliance(shipment_id, safe_min, safe_max)
 
     report = {
         "shipment_id": shipment_id,
@@ -935,18 +1117,26 @@ def api_shipment_report(shipment_id):
         "routing_mode": s.get("routing_mode", "BALANCED"),
         "cargo_value_inr": s.get("cargo_value_inr", 0),
         "current_temp": s.get("temp"),
-        "safe_range": f"{s.get('safe_min_temp', 2)}°C to {s.get('safe_max_temp', 8)}°C",
+        "safe_range": f"{safe_min}°C to {safe_max}°C",
+        "safe_min_temp": safe_min,
+        "safe_max_temp": safe_max,
         "risk_probability": s.get("risk_probability", 0),
+        "risk_level": s.get("risk_level"),
+        "confidence": s.get("confidence"),
+        "spoilage_probability": s.get("spoilage_probability"),
+        "forecast": s.get("forecast"),
         "recommended_action": s.get("recommended_action", "CONTINUE"),
         "decision_reason": s.get("decision_reason", ""),
         "exposure_minutes": s.get("exposure_minutes", 0),
         "divert_hub": s.get("divert_hub", None),
         "divert_distance_km": s.get("divert_distance_km", None),
+        "compliance": compliance,
         "carbon_credits": {
             "co2_saved_tonnes": round(co2_saved, 2),
             "credits_inr": round(co2_saved * CARBON_CREDIT_RATE_INR, 2),
         },
-        "temperature_history": history[-30:],
+        "temperature_history": telemetry_store.get_history(shipment_id, limit=200),
+        "anomalies": telemetry_store.get_shipment_anomalies(shipment_id),
         "generated_at": datetime.now().isoformat(),
     }
     return jsonify(report)
@@ -962,7 +1152,7 @@ def sop_editor_page():
 def api_get_sop_content():
     """Read current SOP file content."""
     try:
-        with open(sop_path, "r") as f:
+        with open(sop_path) as f:
             content = f.read()
         return jsonify({
             "content": content,
@@ -995,17 +1185,14 @@ def api_save_sop_content():
         sop_sync_status["last_mtime"] = os.path.getmtime(sop_path)
         log.info(f"📝 SOP saved via editor ({len(content)} chars), cache cleared")
         # Push SSE
-        try:
-            sse_queue.put_nowait(json.dumps({
-                "type": "sop_update",
-                "data": {
-                    "last_modified": sop_sync_status["last_modified"],
-                    "file_size": sop_sync_status["file_size"],
-                    "change_count": sop_sync_status["change_count"],
-                }
-            }))
-        except queue.Full:
-            pass
+        broadcast({
+            "type": "sop_update",
+            "data": {
+                "last_modified": sop_sync_status["last_modified"],
+                "file_size": sop_sync_status["file_size"],
+                "change_count": sop_sync_status["change_count"],
+            },
+        })
         return jsonify({
             "status": "saved",
             "file_size": len(content),
@@ -1110,7 +1297,11 @@ def main():
     # Start SOP file watcher
     sop_thread = threading.Thread(target=_sop_file_watcher, daemon=True)
     sop_thread.start()
-    log.info("👁️ SOP file watcher started")
+    log.info("SOP file watcher started")
+
+    # Start the batching SQLite writer
+    telemetry_store.start_writer()
+    log.info("Telemetry store started (SQLite, batched writes)")
 
     print("\n" + "=" * 60)
     print("🌐 LiveCold Dashboard")

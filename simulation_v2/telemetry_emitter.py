@@ -151,7 +151,6 @@ class TruckSimulator:
             sim_time = datetime.now(_IST)
 
         # --- GPS movement (advance first to get distance) ---
-        prev_km = self.truck.distance_covered_m / 1000
         road_class = self.truck.current_road_class
         speed_kmh = get_speed(road_class, sim_time.hour, sim_time.minute)
         # Add slight speed variation
@@ -178,9 +177,6 @@ class TruckSimulator:
             pos = self.truck.advance(delta_t, speed_kmh)
             self._driving_hours += delta_t / 3600
 
-        # Track distance covered
-        new_km = self.truck.distance_covered_m / 1000
-        distance_delta = new_km - prev_km
 
         # --- Door events ---
         door = self.door_sim.update(delta_t, is_stopped, self._driving_hours)

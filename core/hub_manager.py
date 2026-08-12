@@ -24,15 +24,17 @@ TEMP_ZONES = {
 }
 
 # Map product types → required temp zones
+# All 9 SOP product types. A product may be stored in any listed zone.
 PRODUCT_TEMP_ZONES = {
-    "vaccines":    ["ultra_cold", "deep_frozen", "chilled"],  # varies by vaccine
-    "frozen_meat": ["frozen", "deep_frozen"],
-    "dairy":       ["chilled"],
-    "seafood":     ["chilled", "frozen"],
+    "vaccines":        ["ultra_cold", "deep_frozen", "chilled"],  # varies by vaccine
     "pharmaceuticals": ["chilled", "cool"],
-    "ice_cream":   ["frozen", "deep_frozen"],
-    "fruits":      ["cool", "ambient"],
-    "flowers":     ["cool"],
+    "frozen_meat":     ["frozen", "deep_frozen"],
+    "ice_cream":       ["frozen", "deep_frozen"],
+    "seafood":         ["chilled", "frozen"],
+    "dairy":           ["chilled"],
+    "vegetables":      ["chilled", "cool"],
+    "fruits":          ["cool", "ambient"],
+    "flowers":         ["chilled", "cool"],
 }
 
 

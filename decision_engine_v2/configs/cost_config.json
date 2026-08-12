@@ -6,5 +6,13 @@
     "monitor_closely_margin_pct": 0.15,
     "base_hub_fixed_cost_inr": 5000,
     "default_hub_distance_km": 30,
-    "compressor_reliability_decay": 0.02
+    "compressor_reliability_decay": 0.02,
+
+    "safety_divert_risk_threshold": 0.55,
+
+    "eco_co2_shadow_price_inr_per_kg": 4000,
+    "eco_co2_limit_kg": 20,
+    "eco_override_multiplier": 3.0,
+
+    "carbon_credit_rate_inr_per_tonne": 1000
 }

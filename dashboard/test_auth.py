@@ -55,7 +55,7 @@ def test_duplicate_email():
     print("\n🔄 Testing Duplicate Email Registration...")
     # First registration should succeed
     requests.post(f"{BASE_URL}/api/auth/register", json=test_driver)
-    
+
     # Second registration with same email should fail
     response = requests.post(f"{BASE_URL}/api/auth/register", json=test_driver)
     print(f"Status: {response.status_code}")
@@ -69,7 +69,7 @@ def test_invalid_password():
     invalid_user = test_driver.copy()
     invalid_user["email"] = f"test-weak-{int(time.time())}@example.com"
     invalid_user["password"] = "weak"  # Too weak
-    
+
     response = requests.post(f"{BASE_URL}/api/auth/register", json=invalid_user)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
@@ -84,7 +84,7 @@ def test_missing_fields():
         "name": "Incomplete User"
         # Missing email, phone, password, vehicleId
     }
-    
+
     response = requests.post(f"{BASE_URL}/api/auth/register", json=incomplete_user)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
@@ -99,11 +99,11 @@ def test_admin_login():
         "password": "SuperAdmin@123",
         "role": "admin"
     }
-    
+
     response = requests.post(f"{BASE_URL}/api/auth/login", json=login_data)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
-    
+
     if response.status_code == 200:
         token = response.json().get("token")
         return token
@@ -117,7 +117,7 @@ def test_token_verification(token):
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    
+
     response = requests.get(f"{BASE_URL}/api/auth/verify", headers=headers)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
@@ -131,7 +131,7 @@ def test_invalid_token():
         "Authorization": "Bearer invalid_token_123",
         "Content-Type": "application/json"
     }
-    
+
     response = requests.get(f"{BASE_URL}/api/auth/verify", headers=headers)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
@@ -155,7 +155,7 @@ def test_invalid_credentials():
         "password": "WrongPassword123!",
         "role": "admin"
     }
-    
+
     response = requests.post(f"{BASE_URL}/api/auth/login", json=login_data)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
@@ -167,33 +167,33 @@ def run_all_tests():
     print("=" * 60)
     print("🧪 LiveCold Authentication Tests")
     print("=" * 60)
-    
+
     results = {}
-    
+
     # Registration tests
     results["driver_registration"] = test_driver_registration()
     results["client_registration"] = test_client_registration()
     results["invalid_password"] = test_invalid_password()
     results["missing_fields"] = test_missing_fields()
     results["invalid_credentials"] = test_invalid_credentials()
-    
+
     # Token tests
     admin_token = test_admin_login()
     if admin_token:
         results["token_verification"] = test_token_verification(admin_token)
-    
+
     results["invalid_token"] = test_invalid_token()
     results["missing_token"] = test_missing_token()
-    
+
     # Summary
     print("\n" + "=" * 60)
     print("📊 Test Results Summary")
     print("=" * 60)
-    
+
     for test_name, passed in results.items():
         status = "✅ PASS" if passed else "❌ FAIL"
         print(f"{status}: {test_name}")
-    
+
     total = len(results)
     passed = sum(1 for v in results.values() if v)
     print(f"\n📈 Total: {passed}/{total} tests passed")

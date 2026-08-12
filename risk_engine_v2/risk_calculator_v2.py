@@ -15,7 +15,11 @@ Thresholds: LOW < 0.35, MEDIUM 0.35–0.65, HIGH > 0.65.
 
 import math
 from collections import defaultdict
-from risk_engine_v2.cargo_profiles import load_cargo_profile, get_weights
+from risk_engine_v2.cargo_profiles import (
+    load_cargo_profile,
+    get_weights,
+    get_degree_hour_midpoint,
+)
 from risk_engine_v2.exposure_tracker import ExposureTracker
 from risk_engine_v2.drift_analyzer import DriftAnalyzer
 
@@ -39,8 +43,26 @@ def compute_exposure_increment(temp_c, safe_max_c, dt_hours):
     return (temp_c - safe_max_c) * dt_hours
 
 
-def compute_spoilage_probability(exposure_degree_hours, a=0.08, b=20.0):
-    """Map cumulative degree-hours to spoilage probability with logistic curve."""
+_SPOILAGE_CURVE_K = 6.0  # logistic half-width in units of the midpoint
+
+
+def compute_spoilage_probability(exposure_degree_hours, a=None, b=20.0):
+    """
+    Map cumulative degree-hours to spoilage probability with a logistic curve.
+
+    `b` is the midpoint — the degree-hours at which spoilage probability is 50%.
+    It is cargo-specific (2 °C·h for vaccines, 20 for frozen meat).
+
+    Steepness defaults to K/b so the curve is anchored at both ends regardless of
+    the midpoint: ~0.2% at zero exposure, 50% at the midpoint, ~99.8% at twice
+    the midpoint. A fixed steepness would leave a cargo with a small midpoint
+    reporting ~46% spoilage before anything had gone wrong at all.
+    """
+    if b <= 0:
+        return 1.0 if exposure_degree_hours > 0 else 0.0
+    if a is None:
+        a = _SPOILAGE_CURVE_K / b
+
     x = a * (exposure_degree_hours - b)
     try:
         return 1.0 / (1.0 + math.exp(-x))
@@ -76,7 +98,7 @@ def linear_forecast(last_readings, horizon_minutes=30):
     sum_x = sum(xs)
     sum_y = sum(ys)
     sum_xx = sum(x * x for x in xs)
-    sum_xy = sum(x * y for x, y in zip(xs, ys))
+    sum_xy = sum(x * y for x, y in zip(xs, ys, strict=True))
 
     denom = n * sum_xx - (sum_x * sum_x)
     if abs(denom) < 1e-9:
@@ -217,7 +239,10 @@ def assess_risk_v2(telemetry, cargo_type=None, delta_t_seconds=2.0):
     degree_inc = compute_exposure_increment(temp, safe_max, dt_hours)
     _degree_hour_state[sid] += degree_inc
     degree_hours = _degree_hour_state[sid]
-    spoilage_prob = compute_spoilage_probability(degree_hours)
+    # Midpoint is cargo-specific: vaccines spoil at 2 °C·h, frozen meat at 20.
+    spoilage_prob = compute_spoilage_probability(
+        degree_hours, b=get_degree_hour_midpoint(cargo_type)
+    )
 
     # --- Compute individual factor scores ---
     s_temp = _score_temp_deviation(temp, safe_min, safe_max)

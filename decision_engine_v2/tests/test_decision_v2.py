@@ -164,7 +164,7 @@ class TestDecisionLogic:
     def test_divert_high_risk(self):
         risk = self._make_risk(0.85, "HIGH")
         # Make all factors elevated for high risk
-        risk["factor_scores"] = {k: 0.8 for k in risk["factor_scores"]}
+        risk["factor_scores"] = dict.fromkeys(risk["factor_scores"], 0.8)
         decision = decide_v2(risk, self._make_shipment())
         assert decision["action"] in ("DIVERT", "MONITOR_CLOSELY")
 
@@ -181,7 +181,7 @@ class TestDecisionLogic:
 
     def test_divert_reason_provided(self):
         risk = self._make_risk(0.85, "HIGH")
-        risk["factor_scores"] = {k: 0.9 for k in risk["factor_scores"]}
+        risk["factor_scores"] = dict.fromkeys(risk["factor_scores"], 0.9)
         decision = decide_v2(risk, self._make_shipment())
         assert len(decision["divert_reason"]) > 0
 
@@ -190,7 +190,7 @@ class TestDecisionLogic:
             return {"nearest_hub_distance_km": 10}
 
         risk = self._make_risk(0.85, "HIGH")
-        risk["factor_scores"] = {k: 0.8 for k in risk["factor_scores"]}
+        risk["factor_scores"] = dict.fromkeys(risk["factor_scores"], 0.8)
         decision = decide_v2(risk, self._make_shipment(),
                              hub_selector=mock_hub)
         assert decision["total_diversion_cost"] > 0

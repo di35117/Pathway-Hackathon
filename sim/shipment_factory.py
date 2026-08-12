@@ -1,75 +1,94 @@
 # sim/shipment_factory.py
+"""
+Builds the demo fleet.
+
+Product types and their safe temperature ranges come from the SOP document via
+core.sop_parser — editing watched_docs/cold_chain_SOP.txt changes what the fleet
+carries and what counts as safe. Cargo economics and default routing mode come
+from risk_engine_v2/configs/cargo_profiles.json.
+"""
 
 import random
-from datetime import datetime
+from datetime import datetime, UTC
+
 from sim.config import CITIES, NUMBER_OF_SHIPMENTS
+from core.sop_parser import get_all_product_profiles
 
 random.seed(42)
 
 _shipments_cache = None
 
-PRODUCT_PROFILES = [
-    {
-        "name": "Vaccines",
-        "safe_min": 2,
-        "safe_max": 8,
-        "base_value": 2500000,
-        "sensitivity": "HIGH"
-    },
-    {
-        "name": "Frozen_Meat",
-        "safe_min": -18,
-        "safe_max": -15,
-        "base_value": 1500000,
-        "sensitivity": "MEDIUM"
-    },
-    {
-        "name": "Dairy",
-        "safe_min": 1,
-        "safe_max": 4,
-        "base_value": 800000,
-        "sensitivity": "MEDIUM"
-    },
-    {
-        "name": "Seafood",
-        "safe_min": 0,
-        "safe_max": 4,
-        "base_value": 1200000,
-        "sensitivity": "HIGH"
-    }
-]
+# Cargo value in ₹ and sensitivity per SOP product. Sensitivity drives how fast
+# the temperature simulator drifts when a reefer degrades.
+_CARGO_ECONOMICS = {
+    "Vaccines":        {"value": 2_500_000, "sensitivity": "HIGH"},
+    "Pharmaceuticals": {"value": 1_800_000, "sensitivity": "HIGH"},
+    "Seafood":         {"value": 1_200_000, "sensitivity": "HIGH"},
+    "Frozen_Meat":     {"value": 1_500_000, "sensitivity": "MEDIUM"},
+    "Ice_Cream":       {"value":   900_000, "sensitivity": "MEDIUM"},
+    "Dairy":           {"value":   800_000, "sensitivity": "MEDIUM"},
+    "Flowers":         {"value":   600_000, "sensitivity": "MEDIUM"},
+    "Vegetables":      {"value":   400_000, "sensitivity": "LOW"},
+    "Fruits":          {"value":   500_000, "sensitivity": "LOW"},
+}
+
+_DEFAULT_ECONOMICS = {"value": 500_000, "sensitivity": "MEDIUM"}
 
 
-def generate_shipments():
+def _product_catalogue():
+    """SOP products joined with their economics, sorted for reproducibility."""
+    catalogue = []
+    for profile in get_all_product_profiles():
+        econ = _CARGO_ECONOMICS.get(profile["name"], _DEFAULT_ECONOMICS)
+        catalogue.append({
+            "name": profile["name"],
+            "safe_min": profile["safe_min"],
+            "safe_max": profile["safe_max"],
+            "base_value": econ["value"],
+            "sensitivity": econ["sensitivity"],
+        })
+    catalogue.sort(key=lambda p: p["name"])
+    return catalogue
+
+
+def generate_shipments(force_regenerate=False):
+    """
+    Build (and cache) the fleet.
+
+    The cache matters: under `sim-all` four simulator threads each call this, and
+    they must receive the same list objects so a temperature drift written by one
+    is visible to the others. Without it you get four independent fleets sharing
+    shipment IDs and reporting contradictory telemetry.
+    """
     global _shipments_cache
 
-    if _shipments_cache is not None:
+    if _shipments_cache is not None and not force_regenerate:
         return _shipments_cache
 
+    products = _product_catalogue()
+    if not products:
+        raise RuntimeError("No product profiles available from SOP or fallback")
+
     shipments = []
-
     for i in range(NUMBER_OF_SHIPMENTS):
-
         start = random.choice(CITIES)
         end = random.choice(CITIES)
-
         while end == start:
             end = random.choice(CITIES)
 
-        product = random.choice(PRODUCT_PROFILES)
+        # Round-robin over the catalogue so all 9 product types appear in a
+        # 25-truck fleet; random.choice would leave some types absent.
+        product = products[i % len(products)]
 
         speed = random.randint(40, 70)
-
-        # simple distance estimate (not exact)
         distance_km = random.randint(200, 1200)
-
         eta_minutes = int((distance_km / speed) * 60)
 
-        shipment = {
-            "shipment_id": f"SHP_{i+1}",
+        shipments.append({
+            "shipment_id": f"SHP_{i + 1}",
             "origin": start[0],
             "destination": end[0],
-            "start_time": datetime.utcnow().isoformat(),
+            "start_time": datetime.now(UTC).isoformat(),
 
             "current_lat": start[1],
             "current_lon": start[2],
@@ -87,10 +106,10 @@ def generate_shipments():
             "sensitivity": product["sensitivity"],
 
             "base_temp": (product["safe_min"] + product["safe_max"]) / 2,
-            "temp_mode": random.choice(["stable", "stable", "drift"])
-        }
-
-        shipments.append(shipment)
+            "temp_mode": random.choice(["stable", "stable", "drift"]),
+            # Fixed per shipment so diversion cost is stable across ticks.
+            "nearest_hub_distance_km": random.randint(10, 80),
+        })
 
     _shipments_cache = shipments
     return shipments

@@ -5,7 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
-
+.pytest_cache/
+.coverage
+coverage.xml
+.ruff_cache/
 
 # Virtual environments
 venv/
@@ -26,7 +29,23 @@ demo_data/
 metrics/
 output/
 Cache/
-watched_docs/
+
+# Databases — schema is code, contents are runtime state
+*.db
+*.db-wal
+*.db-shm
+dashboard/data/
+
+# NOTE: watched_docs/ is deliberately NOT ignored. cold_chain_SOP.txt is the
+# single source of truth for product temperature ranges; the Docker build copies
+# it in and asserts it parses. Ignoring it produced clones that silently fell
+# back to hardcoded ranges.
 
 # Secrets
 .env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+frontend/dist/

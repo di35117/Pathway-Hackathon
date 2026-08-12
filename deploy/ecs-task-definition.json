@@ -1,0 +1,114 @@
+{
+  "family": "livecold",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "3072",
+  "executionRoleArn": "arn:aws:iam::000000000000:role/livecoldEcsExecutionRole",
+  "taskRoleArn": "arn:aws:iam::000000000000:role/livecoldTaskRole",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "volumes": [
+    {
+      "name": "livecold-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-REPLACE_ME",
+        "transitEncryption": "ENABLED",
+        "rootDirectory": "/"
+      }
+    }
+  ],
+  "containerDefinitions": [
+    {
+      "name": "mosquitto",
+      "image": "eclipse-mosquitto:2",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 1883, "protocol": "tcp" }
+      ],
+      "command": [
+        "sh",
+        "-c",
+        "printf 'listener 1883\\nallow_anonymous true\\n' > /mosquitto/config/mosquitto.conf && exec /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "mosquitto_sub -t '$SYS/#' -C 1 -W 3 >/dev/null 2>&1 || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/livecold",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "mosquitto",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "livecold",
+      "image": "REPLACED_BY_CI",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 5050, "protocol": "tcp", "name": "dashboard" },
+        { "containerPort": 8765, "protocol": "tcp", "name": "rag" }
+      ],
+      "dependsOn": [
+        { "containerName": "mosquitto", "condition": "HEALTHY" }
+      ],
+      "environment": [
+        { "name": "MQTT_HOST", "value": "127.0.0.1" },
+        { "name": "MQTT_PORT", "value": "1883" },
+        { "name": "FLASK_ENV", "value": "production" },
+        { "name": "LIVECOLD_ENGINE", "value": "v2" },
+        { "name": "PYTHONUNBUFFERED", "value": "1" }
+      ],
+      "secrets": [
+        {
+          "name": "GOOGLE_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:000000000000:secret:livecold/gemini-api-key"
+        },
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:000000000000:secret:livecold/jwt-secret"
+        },
+        {
+          "name": "SUPER_ADMIN_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:000000000000:secret:livecold/super-admin-password"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "livecold-data",
+          "containerPath": "/app/dashboard/data",
+          "readOnly": false
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5050/health', timeout=4).status==200 else 1)\""
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "stopTimeout": 30,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/livecold",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "app",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}
